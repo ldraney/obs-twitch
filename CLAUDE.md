@@ -10,11 +10,19 @@ Achieve Twitch Affiliate status by streaming consistently with high-quality sett
 - [ ] 50+ followers
 
 ## Current Stream Settings
-- **Resolution:** 1920x1080 (1080p)
+- **Base Resolution:** 2560x1440 (native monitor)
+- **Output Resolution:** 1664x936 (936p - optimal for 6000kbps)
 - **FPS:** 60
 - **Bitrate:** 6000 kbps (Twitch max for non-partners)
 - **Encoder:** NVENC p7 preset (max quality)
+- **B-frames:** 4 (smoother motion)
+- **Multipass:** fullres (better quality analysis)
 - **Capture:** Window Capture (Palworld)
+
+## Why 936p instead of 1080p?
+At 6000kbps, 936p provides more bits per pixel than 1080p, resulting in sharper
+image quality especially during fast motion. The downscale from 1440p also adds
+slight sharpening.
 
 ## Key Files
 - `obs-control.js` - CLI to control OBS via WebSocket
@@ -34,4 +42,4 @@ node obs-control.js scene <name>  # Switch scene
 ## Notes
 - OBS must have WebSocket Server enabled (Tools > WebSocket Server Settings)
 - Game capture may not work with anti-cheat; use Window Capture instead
-- Window Capture source needs to be scaled to fit 1080p canvas
+- Window Capture source at 1:1 scale (OBS handles downscale to 936p)
