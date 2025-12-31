@@ -29,9 +29,12 @@ slight sharpening.
 - `src/lib/metrics.js` - OBS WebSocket metrics collection
 - `src/lib/db.js` - SQLite database for stream history
 - `src/lib/alerts.js` - Threshold-based alerting
+- `src/lib/twitch.js` - Twitch API client for affiliate tracking
 - `src/commands/monitor.js` - Live terminal UI (Ink/React)
 - `src/commands/report.js` - Post-stream report generator
+- `src/commands/affiliate.js` - Affiliate progress tracker
 - `.env` - Contains OBS WebSocket password (gitignored)
+- `~/twitch-secrets/.env` - Twitch API credentials (separate private repo)
 - `data/streams.db` - SQLite database (gitignored)
 
 ## Commands
@@ -41,9 +44,13 @@ npm run obs start              # Start streaming
 npm run obs stop               # Stop streaming
 npm run obs status             # Get stream status with color-coded metrics
 
-# Monitoring (NEW - v2.0)
+# Monitoring
 npm run obs monitor            # Live terminal dashboard (updates every 2s)
 npm run obs report             # Post-stream health report with recommendations
+
+# Affiliate tracking
+npm run obs affiliate          # Show progress toward Twitch Affiliate
+npm run obs affiliate -d       # Detailed breakdown with recent streams
 
 # Diagnostics
 npm run obs diagnose           # Full diagnostic (sources, audio, warnings)

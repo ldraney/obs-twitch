@@ -5,17 +5,17 @@ A complete CLI toolkit for Twitch streamers - control OBS, track affiliate progr
 
 ---
 
-## Phase 1: Affiliate Progress Tracking
+## Phase 1: Affiliate Progress Tracking ✅
 **Goal:** Know exactly where you stand on Twitch Affiliate requirements.
 
-- [ ] `affiliate` - Show progress toward all 4 requirements
+- [x] `affiliate` - Show progress toward all 4 requirements
   - Stream days this month (need 7)
   - Total hours streamed (need 8)
   - Average concurrent viewers (need 3)
   - Follower count (need 50)
-- [ ] `affiliate --detailed` - Show day-by-day breakdown
-- [ ] Twitch API integration for follower/viewer data
-- [ ] Local tracking of stream sessions from SQLite db
+- [x] `affiliate --detailed` - Show day-by-day breakdown
+- [x] Twitch API integration for follower/viewer data
+- [x] Local tracking of stream sessions from SQLite db
 
 ---
 
