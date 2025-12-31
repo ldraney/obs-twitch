@@ -1,48 +1,107 @@
-# OBS Twitch Control
+# OBS Twitch CLI
 
-CLI tool to remotely control OBS Studio for Twitch streaming.
+**For Lucas** - Your personal command center for Twitch streaming and affiliate progress tracking.
+
+## Why This Exists
+
+You want to hit Twitch Affiliate while streaming Palworld. This CLI lets you:
+- Control OBS without leaving the terminal
+- Monitor stream health in real-time
+- Track your progress toward all 4 affiliate requirements
+- Troubleshoot black screens and audio issues fast
+
+## Quick Start
+
+```bash
+npm install
+npm run affiliate    # See where you stand
+npm run obs start    # Go live
+npm run obs monitor  # Watch stream health
+```
+
+## Affiliate Progress
+
+```bash
+npm run affiliate
+```
+
+```
+Twitch Affiliate Progress
+══════════════════════════════════════════════════════
+
+○ Stream Days      2/7   [████░░░░░░░░░░░░░░░░] 29%
+○ Hours Streamed   3.5/8 [████████░░░░░░░░░░░░] 44%
+○ Avg Viewers      1/3   [██████░░░░░░░░░░░░░░] 33%
+○ Followers        2/50  [█░░░░░░░░░░░░░░░░░░░] 4%
+
+Still needed:
+   • 5 more stream days
+   • 4.5 more hours
+   • 2 more avg viewers
+   • 48 more followers
+```
+
+## Stream Control
+
+```bash
+npm run obs start           # Start streaming
+npm run obs stop            # Stop streaming
+npm run obs status          # Quick health check
+npm run obs monitor         # Live dashboard (updates every 2s)
+npm run obs diagnose        # Full diagnostic when something's wrong
+```
+
+## Troubleshooting
+
+Black screen? No audio? Run diagnose first:
+```bash
+npm run obs diagnose
+```
+
+Then fix with:
+```bash
+npm run obs enable "Palworld Window"    # Enable video source
+npm run obs capture-audio "Palworld Window"  # Fix game audio
+npm run obs refresh "Palworld Window"   # Unstick frozen capture
+```
+
+## Terminal Overlay
+
+Show your terminal while gaming (for coding streams):
+```bash
+npm run obs overlay create   # One-time setup
+npm run obs overlay show     # Show terminal overlay
+npm run obs overlay hide     # Hide it
+```
 
 ## Setup
 
-1. Install dependencies:
-   ```bash
-   npm install
+1. **OBS WebSocket** - Enable in OBS: Tools → WebSocket Server Settings
+2. **Create `.env`**:
    ```
-
-2. Create `.env` file with your OBS WebSocket credentials:
-   ```
-   OBS_WEBSOCKET_PASSWORD=your_password_here
+   OBS_WEBSOCKET_PASSWORD=your_password
    OBS_WEBSOCKET_PORT=4455
    ```
+3. **Twitch API** (for follower tracking) - See related repos below
 
-3. Enable WebSocket in OBS:
-   - Tools → WebSocket Server Settings → Enable WebSocket Server
+## Related Repos
 
-## Usage
-
-```bash
-# Start streaming
-node obs-control.js start
-
-# Stop streaming
-node obs-control.js stop
-
-# Check status
-node obs-control.js status
-
-# Switch scene
-node obs-control.js scene "Scene Name"
-```
+| Repo | Purpose |
+|------|---------|
+| [obs-twitch](.) | This CLI - OBS control + affiliate tracking |
+| `~/twitch-client` | Twitch API test project (OAuth learning) |
+| `~/twitch-secrets` | Private repo for API credentials |
 
 ## Stream Settings
 
-Optimized for Twitch (non-partner):
-- 1080p @ 60fps
-- 6000 kbps CBR
-- NVENC encoder (p7 preset)
+Optimized for 6000kbps (Twitch max for non-partners):
+- **Output:** 1664x936 @ 60fps (936p - more bits per pixel than 1080p)
+- **Encoder:** NVENC p7 (max quality)
+- **Bitrate:** 6000 kbps CBR
 
 ## Requirements
 
 - Node.js 18+
-- OBS Studio 28+ (has built-in WebSocket)
-- NVIDIA GPU (for NVENC encoding)
+- OBS Studio 28+ (built-in WebSocket)
+- NVIDIA GPU (for NVENC)
+- Windows (for terminal overlay)
