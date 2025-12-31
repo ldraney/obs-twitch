@@ -40,9 +40,14 @@ slight sharpening.
 ## Commands
 ```bash
 # Stream control
-npm run obs start              # Start streaming
+npm run obs go                 # Pre-flight WiFi check + start streaming (RECOMMENDED)
+npm run obs start              # Start streaming (no WiFi check)
 npm run obs stop               # Stop streaming
 npm run obs status             # Get stream status with color-coded metrics
+
+# WiFi (fixes dropped frames from 2.4GHz)
+npm run obs wifi               # Force reconnect to 5GHz band
+npm run obs wifi -- -c         # Check current band without reconnecting
 
 # Monitoring
 npm run obs monitor            # Live terminal dashboard (updates every 2s)
@@ -174,6 +179,28 @@ node src/cli.js overlay 0.7     # Set OBS-level opacity (0.0-1.0)
 - Source is scaled to BASE resolution (2560x1440), not output (1664x936)
 - OBS downscales the whole canvas to output resolution
 - To resize/reposition, modify transform in src/cli.js `controlOverlay()` function
+
+## Troubleshooting WiFi/Network Issues
+
+High dropped frames (>5%) with low bitrate often indicates WiFi problems.
+
+**Automated fix:**
+```bash
+npm run obs wifi               # Force reconnect to 5 GHz
+npm run obs go                 # WiFi check + start stream (recommended startup)
+```
+
+**Manual diagnosis:**
+```bash
+npm run obs wifi -- -c         # Check current band
+ping -n 5 10.0.0.1             # Test latency (should be <5ms)
+```
+
+**Common cause:** Connected to 2.4 GHz instead of 5 GHz
+- 2.4 GHz: congested, high latency, packet loss
+- 5 GHz: faster, less interference, lower latency
+
+**Full guide:** See `docs/wifi-troubleshooting.md`
 
 ## Notes
 - OBS must have WebSocket Server enabled (Tools > WebSocket Server Settings)

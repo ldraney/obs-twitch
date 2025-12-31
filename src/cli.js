@@ -355,4 +355,152 @@ program
     await affiliate(options);
   });
 
+// WiFi fix - force 5GHz connection
+program
+  .command('wifi')
+  .description('Force reconnect to 5GHz WiFi band')
+  .option('-c, --check', 'Only check current band, don\'t reconnect')
+  .action(async (options) => {
+    const { execSync } = require('child_process');
+    const SSID = 'shemonhedin';
+    const INTERFACE = 'Wi-Fi';
+
+    try {
+      // Check current connection
+      const status = execSync(`netsh wlan show interfaces`, { encoding: 'utf8' });
+      const bandMatch = status.match(/Band\s*:\s*(.+)/i);
+      const signalMatch = status.match(/Signal\s*:\s*(\d+)%/i);
+      const ssidMatch = status.match(/SSID\s*:\s*(.+)/i);
+
+      const currentBand = bandMatch ? bandMatch[1].trim() : 'Unknown';
+      const currentSignal = signalMatch ? signalMatch[1] : '?';
+      const currentSsid = ssidMatch ? ssidMatch[1].trim() : 'Not connected';
+
+      console.log(chalk.bold('\n=== WiFi Status ==='));
+      console.log(`Network: ${currentSsid}`);
+      console.log(`Band: ${currentBand.includes('5') ? chalk.green(currentBand) : chalk.red(currentBand)}`);
+      console.log(`Signal: ${currentSignal}%`);
+
+      if (options.check) {
+        return;
+      }
+
+      if (currentBand.includes('5')) {
+        console.log(chalk.green('\n✓ Already on 5 GHz - no action needed'));
+        return;
+      }
+
+      console.log(chalk.yellow('\n⚠ On 2.4 GHz - forcing 5 GHz reconnect...'));
+
+      // Disconnect and reconnect (adapter "Prefer 5GHz" setting should kick in)
+      console.log('  Disconnecting...');
+      execSync(`netsh wlan disconnect interface="${INTERFACE}"`, { encoding: 'utf8' });
+
+      // Wait for clean disconnect
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Reconnect using existing profile
+      console.log('  Reconnecting...');
+      execSync(`netsh wlan connect name="${SSID}" interface="${INTERFACE}"`, { encoding: 'utf8' });
+
+      // Wait for connection
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Check result
+      const newStatus = execSync(`netsh wlan show interfaces`, { encoding: 'utf8' });
+      const newBandMatch = newStatus.match(/Band\s*:\s*(.+)/i);
+      const newSignalMatch = newStatus.match(/Signal\s*:\s*(\d+)%/i);
+      const newBand = newBandMatch ? newBandMatch[1].trim() : 'Unknown';
+      const newSignal = newSignalMatch ? newSignalMatch[1] : '?';
+
+      console.log(chalk.bold('\n=== Result ==='));
+      console.log(`Band: ${newBand.includes('5') ? chalk.green(newBand) : chalk.red(newBand)}`);
+      console.log(`Signal: ${newSignal}%`);
+
+      if (newBand.includes('5')) {
+        console.log(chalk.green('\n✓ Successfully connected to 5 GHz!'));
+      } else {
+        console.log(chalk.red('\n✗ Still on 2.4 GHz - manual reconnection may be needed'));
+        console.log(chalk.cyan('  Try: Windows Settings > WiFi > Forget network > Reconnect'));
+      }
+
+    } catch (error) {
+      console.error(chalk.red('Failed:'), error.message);
+    }
+  });
+
+// Go Live - WiFi check + start stream
+program
+  .command('go')
+  .alias('golive')
+  .description('Pre-flight check (WiFi) + start streaming')
+  .action(async () => {
+    const { execSync } = require('child_process');
+
+    try {
+      console.log(chalk.bold('\n=== Pre-flight Check ===\n'));
+
+      // Check WiFi band
+      const status = execSync(`netsh wlan show interfaces`, { encoding: 'utf8' });
+      const bandMatch = status.match(/Band\s*:\s*(.+)/i);
+      const signalMatch = status.match(/Signal\s*:\s*(\d+)%/i);
+      const currentBand = bandMatch ? bandMatch[1].trim() : 'Unknown';
+      const currentSignal = signalMatch ? parseInt(signalMatch[1]) : 0;
+
+      console.log(`WiFi Band: ${currentBand.includes('5') ? chalk.green(currentBand + ' ✓') : chalk.red(currentBand + ' ✗')}`);
+      console.log(`Signal: ${currentSignal >= 50 ? chalk.green(currentSignal + '%') : chalk.yellow(currentSignal + '%')}`);
+
+      // If on 2.4GHz, try to fix
+      if (!currentBand.includes('5')) {
+        console.log(chalk.yellow('\n⚠ On 2.4 GHz - attempting fix...'));
+
+        execSync(`netsh wlan disconnect interface="Wi-Fi"`, { encoding: 'utf8' });
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        execSync(`netsh wlan connect name="shemonhedin" interface="Wi-Fi"`, { encoding: 'utf8' });
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const newStatus = execSync(`netsh wlan show interfaces`, { encoding: 'utf8' });
+        const newBandMatch = newStatus.match(/Band\s*:\s*(.+)/i);
+        const newBand = newBandMatch ? newBandMatch[1].trim() : 'Unknown';
+
+        if (newBand.includes('5')) {
+          console.log(chalk.green('✓ Fixed! Now on 5 GHz'));
+        } else {
+          console.log(chalk.red('✗ Still on 2.4 GHz - stream may have issues'));
+        }
+      }
+
+      // Test latency
+      console.log('\nTesting network...');
+      try {
+        const ping = execSync(`ping -n 3 10.0.0.1`, { encoding: 'utf8' });
+        const avgMatch = ping.match(/Average = (\d+)ms/i);
+        const avgLatency = avgMatch ? parseInt(avgMatch[1]) : 999;
+        console.log(`Router latency: ${avgLatency < 10 ? chalk.green(avgLatency + 'ms ✓') : chalk.yellow(avgLatency + 'ms')}`);
+      } catch (e) {
+        console.log(chalk.yellow('Could not test latency'));
+      }
+
+      // Start stream
+      console.log(chalk.bold('\n=== Starting Stream ===\n'));
+      await obs.startStream();
+      console.log(chalk.green('Stream started!'));
+
+      // Quick health check
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const metrics = await obs.getFullMetrics();
+      console.log(`\nBitrate: ${colorizeValue('bitrate', metrics.stream.bitrate)} kbps`);
+      console.log(`Dropped: ${colorizeValue('droppedPercent', metrics.stream.droppedPercent)}%`);
+
+    } catch (error) {
+      if (error.message.includes('already active')) {
+        console.log(chalk.yellow('Stream is already running'));
+      } else {
+        console.error(chalk.red('Failed:'), error.message);
+      }
+    } finally {
+      await obs.disconnect();
+    }
+  });
+
 program.parse();
