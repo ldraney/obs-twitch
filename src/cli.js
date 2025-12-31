@@ -345,4 +345,14 @@ program
     await report(options.session);
   });
 
+// Affiliate progress
+program
+  .command('affiliate')
+  .description('Show Twitch Affiliate progress')
+  .option('-d, --detailed', 'Show detailed stream breakdown')
+  .action(async (options) => {
+    const affiliate = require('./commands/affiliate');
+    await affiliate(options);
+  });
+
 program.parse();
