@@ -25,37 +25,71 @@ image quality especially during fast motion. The downscale from 1440p also adds
 slight sharpening.
 
 ## Key Files
-- `obs-control.js` - CLI to control OBS via WebSocket
+- `src/cli.js` - Main CLI entry point (Commander.js)
+- `src/lib/metrics.js` - OBS WebSocket metrics collection
+- `src/lib/db.js` - SQLite database for stream history
+- `src/lib/alerts.js` - Threshold-based alerting
+- `src/commands/monitor.js` - Live terminal UI (Ink/React)
+- `src/commands/report.js` - Post-stream report generator
 - `.env` - Contains OBS WebSocket password (gitignored)
+- `data/streams.db` - SQLite database (gitignored)
 
 ## Commands
 ```bash
 # Stream control
-node obs-control.js start              # Start streaming
-node obs-control.js stop               # Stop streaming
-node obs-control.js status             # Get stream status
+npm run obs start              # Start streaming
+npm run obs stop               # Stop streaming
+npm run obs status             # Get stream status with color-coded metrics
+
+# Monitoring (NEW - v2.0)
+npm run obs monitor            # Live terminal dashboard (updates every 2s)
+npm run obs report             # Post-stream health report with recommendations
 
 # Diagnostics
-node obs-control.js diagnose           # Full diagnostic (sources, audio, warnings)
-node obs-control.js sources            # List video sources + their status
-node obs-control.js audio              # List audio sources + capture settings
+npm run obs diagnose           # Full diagnostic (sources, audio, warnings)
+npm run obs sources            # List video sources + their status
+npm run obs audio              # List audio sources + capture settings
 
 # Video sources
-node obs-control.js scene <name>       # Switch scene
-node obs-control.js enable <source>    # Enable a source
-node obs-control.js disable <source>   # Disable a source
-node obs-control.js refresh <source>   # Toggle off/on to fix capture
+npm run obs enable <source>    # Enable a source
+npm run obs disable <source>   # Disable a source
+npm run obs refresh <source>   # Toggle off/on to fix capture
 
 # Audio control
-node obs-control.js capture-audio <src>  # Enable audio capture on window/game source
-node obs-control.js mute <source>        # Mute an audio source
-node obs-control.js unmute <source>      # Unmute an audio source
-
-# Terminal overlay (coding while gaming)
-node obs-control.js overlay show         # Show terminal overlay
-node obs-control.js overlay hide         # Hide terminal overlay
-node obs-control.js overlay 0.7          # Set overlay opacity (0.0-1.0)
+npm run obs capture-audio <src>  # Enable audio capture on window/game source
+npm run obs mute <source>        # Mute an audio source
+npm run obs unmute <source>      # Unmute an audio source
 ```
+
+## Stream Monitoring
+
+### Live Dashboard (`npm run obs monitor`)
+Real-time terminal UI showing:
+- Stream status (LIVE/OFFLINE) with duration
+- Bitrate with visual bar (color-coded: green/yellow/red)
+- CPU, Memory, FPS metrics
+- Dropped frames percentage
+- Active warnings and alerts
+
+Keyboard shortcuts: `q` quit, `r` refresh
+
+Metrics are automatically logged to SQLite every 30 seconds.
+
+### Post-Stream Report (`npm run obs report`)
+After streaming, view health analysis:
+- Health score (0-100)
+- Average/peak bitrate, CPU, dropped frames
+- Error summary with counts
+- Recommendations for improvement
+- Recent session history comparison
+
+### Alert Thresholds
+| Metric | Green | Yellow | Red |
+|--------|-------|--------|-----|
+| Bitrate | >5500 | 4000-5500 | <4000 |
+| Dropped % | <1% | 1-5% | >5% |
+| CPU | <70% | 70-90% | >90% |
+| FPS | 60 | 55-59 | <55 |
 
 ## OBS Config Location
 `%APPDATA%\obs-studio\basic\profiles\Palworld\`
@@ -64,16 +98,16 @@ node obs-control.js overlay 0.7          # Set overlay opacity (0.0-1.0)
 
 **ALWAYS run `diagnose` first** when stream shows black:
 ```bash
-node obs-control.js diagnose
+node src/cli.js diagnose
 ```
 
 ### Common causes:
 1. **Source disabled** - Check `--- SOURCES ---` output for `✗ DISABLED`
-   - Fix: `node obs-control.js enable "Source Name"`
+   - Fix: `node src/cli.js enable "Source Name"`
 2. **Wrong source active** - Display Capture enabled but game capture disabled
    - Fix: Enable game capture, optionally disable display capture
 3. **Window not found** - Game closed/minimized after OBS started
-   - Fix: `node obs-control.js refresh "Palworld Window"`
+   - Fix: `node src/cli.js refresh "Palworld Window"`
 4. **Game in wrong mode** - Fullscreen exclusive can break capture
    - Fix: Use Borderless Windowed in game settings
 
@@ -86,14 +120,14 @@ node obs-control.js diagnose
 
 **Run `audio` command first:**
 ```bash
-node obs-control.js audio
+node src/cli.js audio
 ```
 
 ### Common causes:
 1. **Capture Audio disabled** - Window/Game capture not capturing game sound
-   - Fix: `node obs-control.js capture-audio "Palworld Window"`
+   - Fix: `node src/cli.js capture-audio "Palworld Window"`
 2. **Source muted** - Audio source shows 🔇 MUTED
-   - Fix: `node obs-control.js unmute "Source Name"`
+   - Fix: `node src/cli.js unmute "Source Name"`
 3. **No global audio** - No Desktop Audio or Mic configured
    - Fix: In OBS > Settings > Audio > Global Audio Devices
    - Select speakers for Desktop Audio, mic for Mic/Aux
@@ -109,11 +143,12 @@ node obs-control.js audio
 
 Show Windows Terminal as a transparent overlay while gaming, so viewers can watch you code.
 
-### One-time OBS setup:
-1. In OBS, add a new **Window Capture** source named "Terminal Overlay"
-2. Select your Windows Terminal window
-3. Position it on the right ~35% of the screen
-4. Ensure it's **above** the game source in the source list (renders on top)
+### Setup:
+```bash
+node src/cli.js overlay create  # Creates Window Capture source for Windows Terminal
+```
+
+This auto-creates "Terminal Overlay" source, captures Windows Terminal, and scales it to fill the base canvas (2560x1440).
 
 ### Windows Terminal transparency:
 - Open Windows Terminal Settings > Appearance
@@ -122,10 +157,16 @@ Show Windows Terminal as a transparent overlay while gaming, so viewers can watc
 
 ### CLI commands:
 ```bash
-node obs-control.js overlay show    # When you're coding
-node obs-control.js overlay hide    # When you're just gaming
-node obs-control.js overlay 0.5     # Adjust OBS-level opacity if needed
+node src/cli.js overlay create  # One-time setup
+node src/cli.js overlay show    # Show overlay (when coding)
+node src/cli.js overlay hide    # Hide overlay (when just gaming)
+node src/cli.js overlay 0.7     # Set OBS-level opacity (0.0-1.0)
 ```
+
+### Positioning notes:
+- Source is scaled to BASE resolution (2560x1440), not output (1664x936)
+- OBS downscales the whole canvas to output resolution
+- To resize/reposition, modify transform in src/cli.js `controlOverlay()` function
 
 ## Notes
 - OBS must have WebSocket Server enabled (Tools > WebSocket Server Settings)

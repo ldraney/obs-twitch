@@ -1,5 +1,6 @@
-.env
-node_modules/
 *.png
-nul
 .claude/
+.env
+data/
+node_modules/
+nul

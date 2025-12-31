@@ -1,15 +1,27 @@
 {
   "name": "obs-twitch",
-  "version": "1.0.0",
-  "description": "OBS remote control for Twitch streaming",
-  "main": "obs-control.js",
+  "version": "2.0.0",
+  "description": "OBS remote control and monitoring for Twitch streaming",
+  "main": "src/cli.js",
+  "bin": {
+    "obs": "./src/cli.js"
+  },
   "scripts": {
-    "start": "node obs-control.js start",
-    "stop": "node obs-control.js stop",
-    "status": "node obs-control.js status"
+    "obs": "node src/cli.js",
+    "start": "node src/cli.js start",
+    "stop": "node src/cli.js stop",
+    "status": "node src/cli.js status",
+    "monitor": "node src/cli.js monitor",
+    "diagnose": "node src/cli.js diagnose",
+    "report": "node src/cli.js report"
   },
   "dependencies": {
     "obs-websocket-js": "^5.0.6",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "commander": "^12.1.0",
+    "ink": "^3.2.0",
+    "react": "^17.0.2",
+    "better-sqlite3": "^11.7.0",
+    "chalk": "^4.1.2"
   }
 }
