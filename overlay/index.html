@@ -208,6 +208,77 @@
     }
     #connection-status.connected { background: rgba(0, 128, 0, 0.7); }
     #connection-status.disconnected { background: rgba(255, 0, 0, 0.7); }
+
+    /* ============================================
+       CHAT OVERLAY STYLES - Persistent Chatbox
+       ============================================ */
+    #chat-container {
+      position: fixed;
+      bottom: 50px;
+      right: 30px;
+      width: 500px;
+      height: 400px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 2px solid rgba(145, 70, 255, 0.5);
+      border-radius: 12px;
+      padding: 10px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      z-index: 50;
+    }
+
+    /* Custom scrollbar */
+    #chat-container::-webkit-scrollbar {
+      width: 8px;
+    }
+    #chat-container::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+    }
+    #chat-container::-webkit-scrollbar-thumb {
+      background: rgba(145, 70, 255, 0.6);
+      border-radius: 4px;
+    }
+
+    .chat-message {
+      background: rgba(0, 0, 0, 0.5);
+      border-left: 3px solid #9146ff;
+      padding: 8px 12px;
+      margin-bottom: 6px;
+      border-radius: 0 6px 6px 0;
+      font-size: 18px;
+      line-height: 1.3;
+      opacity: 1;
+    }
+
+    .chat-message.show {
+      opacity: 1;
+    }
+
+    .chat-badges {
+      margin-right: 4px;
+    }
+
+    .chat-badges .badge {
+      font-size: 14px;
+      margin-right: 2px;
+    }
+
+    .chat-username {
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    .chat-separator {
+      color: #888;
+      margin: 0 4px;
+    }
+
+    .chat-text {
+      color: #fff;
+      word-wrap: break-word;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
   </style>
 </head>
 <body>
@@ -232,6 +303,9 @@
     <div class="sub-months"></div>
   </div>
 
+  <!-- Chat overlay -->
+  <div id="chat-container"></div>
+
   <div id="connection-status" class="disconnected">Connecting...</div>
 
   <script type="module">
@@ -239,6 +313,7 @@
     import * as raidEffect from './modules/raid.js';
     import * as subscribeEffect from './modules/subscribe.js';
     import * as audio from './modules/audio.js';
+    import * as chat from './modules/chat.js';
 
     // ============================================
     // CANVAS SETUP
@@ -252,6 +327,11 @@
     }
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
+
+    // ============================================
+    // CHAT SETUP
+    // ============================================
+    chat.init(document.getElementById('chat-container'));
 
     // ============================================
     // EFFECT REGISTRY
@@ -316,7 +396,9 @@
           const data = JSON.parse(event.data);
           console.log('📨 Event:', data);
 
-          if (data.type && data.type !== 'connected') {
+          if (data.type === 'chat') {
+            chat.addMessage(data);
+          } else if (data.type && data.type !== 'connected') {
             triggerEffect(data);
           }
         } catch (e) {
@@ -341,19 +423,32 @@
     // KEYBOARD TESTING (dev only)
     // ============================================
     document.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+
+      // Chat test (C key)
+      if (key === 'c') {
+        chat.addMessage({
+          type: 'chat',
+          username: 'TestChatter',
+          message: 'Hello from the chat! This is a test message 🎉',
+          color: '#' + Math.floor(Math.random()*16777215).toString(16),
+          badges: ['subscriber'],
+        });
+        return;
+      }
+
       const testEvents = {
         'f': { type: 'follow', username: 'TestFollower_' + Math.floor(Math.random() * 1000) },
         'r': { type: 'raid', username: 'RaidLeader', viewers: 50 },
         's': { type: 'subscribe', username: 'NewSub', months: 1 },
       };
 
-      const key = e.key.toLowerCase();
       if (testEvents[key]) {
         triggerEffect(testEvents[key]);
       }
     });
 
-    console.log('🎬 Overlay loaded! Keyboard shortcuts: F=follow, R=raid, S=subscribe');
+    console.log('🎬 Overlay loaded! Keyboard shortcuts: F=follow, R=raid, S=subscribe, C=chat');
   </script>
 </body>
 </html>

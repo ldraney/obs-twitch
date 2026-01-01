@@ -10,6 +10,11 @@
 
 import { WebSocket } from 'ws';
 
+const CHAT_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+  '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
+];
+
 const EVENTS = {
   follow: (username) => ({
     type: 'follow',
@@ -33,6 +38,14 @@ const EVENTS = {
     type: 'bits',
     username: username || 'BitsCheerer',
     amount: parseInt(amount) || 100,
+  }),
+
+  chat: (username, message) => ({
+    type: 'chat',
+    username: username || 'ClaudeBot',
+    message: message || 'Hello from the test trigger! 🤖',
+    color: CHAT_COLORS[Math.floor(Math.random() * CHAT_COLORS.length)],
+    badges: [],
   }),
 };
 
@@ -84,6 +97,7 @@ async function main() {
     console.log('  raid "Username" 50          Trigger raid alert with viewer count');
     console.log('  subscribe "Username" 3      Trigger sub alert with month count');
     console.log('  bits "Username" 500         Trigger bits alert with amount');
+    console.log('  chat "Username" "Message"   Send a chat message to overlay');
     console.log('');
     console.log('Options:');
     console.log('  --loop <event>              Send event every 5 seconds');

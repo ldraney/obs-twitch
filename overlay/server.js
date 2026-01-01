@@ -12,9 +12,14 @@
  */
 
 import { config } from 'dotenv';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
 import { homedir } from 'os';
+import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import { readFileSync, existsSync } from 'fs';
 import { WebSocketServer, WebSocket } from 'ws';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Load secrets
 config({ path: resolve(homedir(), 'twitch-secrets', '.env') });
@@ -23,12 +28,22 @@ const CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const ACCESS_TOKEN = process.env.TWITCH_ACCESS_TOKEN;
 const USERNAME = process.env.TWITCH_USERNAME || 'devopsphilosopher';
 
+// Bot account for sending messages
+const BOT_USERNAME = process.env.BOT_USERNAME || 'butlerbotphilo';
+const BOT_ACCESS_TOKEN = process.env.BOT_ACCESS_TOKEN;
+
 const TWITCH_EVENTSUB_URL = 'wss://eventsub.wss.twitch.tv/ws';
-const LOCAL_PORT = 8080;
+const TWITCH_IRC_URL = 'wss://irc-ws.chat.twitch.tv:443';
+const WS_PORT = 8080;
+const HTTP_PORT = 3001;
 
 const overlayClients = new Set();
 let broadcasterId = null;
 let twitchConnected = false;
+let chatConnected = false;
+let chatSocket = null; // Main account - for reading chat
+let botSocket = null;  // Bot account - for sending messages
+let botConnected = false;
 
 // ============================================
 // TWITCH API HELPERS
@@ -202,6 +217,162 @@ function handleTwitchEvent(payload) {
 }
 
 // ============================================
+// TWITCH IRC (CHAT) CONNECTION
+// ============================================
+
+function connectToChat() {
+  console.log('💬 Connecting to Twitch Chat...');
+  const ws = new WebSocket(TWITCH_IRC_URL);
+  chatSocket = ws; // Store for sending messages
+
+  ws.on('open', () => {
+    console.log('✅ Connected to Twitch IRC');
+
+    // Authenticate
+    ws.send(`PASS oauth:${ACCESS_TOKEN}`);
+    ws.send(`NICK ${USERNAME.toLowerCase()}`);
+
+    // Request capabilities for badges, colors, etc.
+    ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
+
+    // Join channel
+    ws.send(`JOIN #${USERNAME.toLowerCase()}`);
+
+    chatConnected = true;
+  });
+
+  ws.on('message', (data) => {
+    const message = data.toString();
+
+    // Handle PING to stay connected
+    if (message.startsWith('PING')) {
+      ws.send('PONG :tmi.twitch.tv');
+      return;
+    }
+
+    // Parse PRIVMSG (chat messages)
+    if (message.includes('PRIVMSG')) {
+      const chatEvent = parseIRCMessage(message);
+      if (chatEvent) {
+        console.log(`💬 ${chatEvent.username}: ${chatEvent.message}`);
+        broadcastToOverlays(chatEvent);
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('❌ Chat disconnected, reconnecting in 5s...');
+    chatConnected = false;
+    setTimeout(connectToChat, 5000);
+  });
+
+  ws.on('error', (err) => console.error('Chat error:', err.message));
+}
+
+function connectBot() {
+  if (!BOT_ACCESS_TOKEN) {
+    console.log('⚠️  No bot token - messages will send as main account');
+    return;
+  }
+
+  console.log(`🤖 Connecting bot (${BOT_USERNAME})...`);
+  const ws = new WebSocket(TWITCH_IRC_URL);
+  botSocket = ws;
+
+  ws.on('open', () => {
+    // Authenticate as bot
+    ws.send(`PASS oauth:${BOT_ACCESS_TOKEN}`);
+    ws.send(`NICK ${BOT_USERNAME.toLowerCase()}`);
+
+    // Join the channel
+    ws.send(`JOIN #${USERNAME.toLowerCase()}`);
+
+    botConnected = true;
+    console.log(`✅ Bot connected as ${BOT_USERNAME}`);
+  });
+
+  ws.on('message', (data) => {
+    const message = data.toString();
+    if (message.startsWith('PING')) {
+      ws.send('PONG :tmi.twitch.tv');
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('❌ Bot disconnected, reconnecting in 5s...');
+    botConnected = false;
+    setTimeout(connectBot, 5000);
+  });
+
+  ws.on('error', (err) => console.error('Bot error:', err.message));
+}
+
+function parseIRCMessage(raw) {
+  try {
+    // Parse IRC tags (badges, color, display-name, etc.)
+    const tagMatch = raw.match(/^@([^ ]+)/);
+    const tags = {};
+    if (tagMatch) {
+      tagMatch[1].split(';').forEach(tag => {
+        const [key, value] = tag.split('=');
+        tags[key] = value;
+      });
+    }
+
+    // Parse the PRIVMSG content
+    const msgMatch = raw.match(/:([^!]+)![^@]+@[^ ]+ PRIVMSG #[^ ]+ :(.+)/);
+    if (!msgMatch) return null;
+
+    const username = tags['display-name'] || msgMatch[1];
+    const message = msgMatch[2].trim();
+    const color = tags['color'] || null;
+
+    // Parse badges
+    const badges = [];
+    if (tags['badges']) {
+      const badgeList = tags['badges'].split(',');
+      badgeList.forEach(badge => {
+        if (badge.startsWith('broadcaster')) badges.push('broadcaster');
+        else if (badge.startsWith('moderator')) badges.push('moderator');
+        else if (badge.startsWith('vip')) badges.push('vip');
+        else if (badge.startsWith('subscriber')) badges.push('subscriber');
+      });
+    }
+
+    return {
+      type: 'chat',
+      username,
+      message,
+      color,
+      badges,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (e) {
+    console.error('Failed to parse IRC message:', e.message);
+    return null;
+  }
+}
+
+// ============================================
+// SEND TO TWITCH CHAT
+// ============================================
+
+function sendToTwitchChat(message) {
+  // Prefer bot, fall back to main account
+  const socket = botSocket?.readyState === WebSocket.OPEN ? botSocket : chatSocket;
+  const sender = botSocket?.readyState === WebSocket.OPEN ? BOT_USERNAME : USERNAME;
+
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.log('⚠️  Cannot send to Twitch chat - not connected');
+    return false;
+  }
+
+  socket.send(`PRIVMSG #${USERNAME.toLowerCase()} :${message}`);
+  console.log(`📤 ${sender}: ${message}`);
+  return true;
+}
+
+// ============================================
 // LOCAL WEBSOCKET SERVER
 // ============================================
 
@@ -217,8 +388,55 @@ function broadcastToOverlays(event) {
   if (sent > 0) console.log(`📢 Sent to ${sent} overlay(s)`);
 }
 
+function startHttpServer() {
+  const MIME_TYPES = {
+    '.html': 'text/html',
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.ogg': 'audio/ogg',
+  };
+
+  const server = createServer((req, res) => {
+    let filePath = req.url === '/' ? '/index.html' : req.url;
+    filePath = resolve(__dirname, '.' + filePath);
+
+    if (!existsSync(filePath)) {
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
+
+    const ext = filePath.substring(filePath.lastIndexOf('.'));
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+    try {
+      const content = readFileSync(filePath);
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(content);
+    } catch (e) {
+      res.writeHead(500);
+      res.end('Server error');
+    }
+  });
+
+  server.listen(HTTP_PORT, () => {
+    console.log(`🌐 HTTP server: http://localhost:${HTTP_PORT}`);
+  });
+}
+
 function startLocalServer() {
-  const wss = new WebSocketServer({ port: LOCAL_PORT });
+  // Start HTTP server first (serves overlay files)
+  startHttpServer();
+
+  // Start WebSocket server
+  const wss = new WebSocketServer({ port: WS_PORT });
 
   wss.on('connection', (ws) => {
     console.log('🖥️  Overlay connected');
@@ -230,10 +448,19 @@ function startLocalServer() {
       twitchConnected,
     }));
 
-    // Handle test events from CLI
+    // Handle messages from CLI
     ws.on('message', (data) => {
       try {
         const message = JSON.parse(data.toString());
+
+        // Send message to actual Twitch chat
+        if (message.type === 'send') {
+          console.log(`\n📤 SEND TO TWITCH: ${message.message}`);
+          sendToTwitchChat(message.message);
+          return;
+        }
+
+        // Test overlay events
         if (message.type && message.type !== 'connected') {
           console.log(`\n🧪 TEST: ${message.type} - ${message.username || 'unknown'}`);
           broadcastToOverlays(message);
@@ -247,7 +474,7 @@ function startLocalServer() {
     });
   });
 
-  console.log(`🚀 Overlay server: ws://localhost:${LOCAL_PORT}`);
+  console.log(`🚀 WebSocket server: ws://localhost:${WS_PORT}`);
   return wss;
 }
 
@@ -280,8 +507,14 @@ async function main() {
   // Start local server
   startLocalServer();
 
-  // Connect to Twitch
+  // Connect to Twitch EventSub (follows, raids, subs)
   connectToTwitch();
+
+  // Connect to Twitch Chat (IRC) - reads chat
+  connectToChat();
+
+  // Connect bot account - sends messages
+  connectBot();
 
   console.log('');
   console.log('📺 OBS Browser Source:');

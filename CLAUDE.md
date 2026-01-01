@@ -33,6 +33,9 @@ slight sharpening.
 - `src/commands/monitor.js` - Live terminal UI (Ink/React)
 - `src/commands/report.js` - Post-stream report generator
 - `src/commands/affiliate.js` - Affiliate progress tracker
+- `overlay/index.html` - OBS Browser Source overlay (celebrations + chat)
+- `overlay/server.js` - WebSocket server (Twitch EventSub + IRC chat)
+- `overlay/modules/chat.js` - Chat display module
 - `.env` - Contains OBS WebSocket password (gitignored)
 - `~/twitch-secrets/.env` - Twitch API credentials (separate private repo)
 - `data/streams.db` - SQLite database (gitignored)
@@ -71,6 +74,14 @@ npm run obs refresh <source>   # Toggle off/on to fix capture
 npm run obs capture-audio <src>  # Enable audio capture on window/game source
 npm run obs mute <source>        # Mute an audio source
 npm run obs unmute <source>      # Unmute an audio source
+
+# Chat overlay (test messages to overlay only)
+npm run obs chat "Hello world!"  # Send test message to overlay
+npm run obs chat "Hi" -u Viewer  # Send as specific user
+npm run obs chat "Hi" -c "#FF0000" -b broadcaster  # Custom color + badge
+
+# Butler bot (sends to real Twitch chat as butlerbotphilo)
+npm run obs say "Hello chat!"    # Bot posts to Twitch chat
 ```
 
 ## Stream Monitoring
@@ -222,6 +233,55 @@ Press these keys when viewing `overlay/index.html` directly in a browser:
 - `F` - Test follow animation
 - `R` - Test raid animation
 - `S` - Test subscribe animation
+- `C` - Test chat message
+
+## Chat Overlay Setup
+
+Display Twitch chat messages on your stream overlay in a persistent chatbox.
+
+### How it works:
+1. The overlay server connects to Twitch IRC (reads chat)
+2. Butler bot (butlerbotphilo) connects separately to send messages
+3. Real chat messages displayed on overlay
+4. CLI commands for testing and bot messages
+
+### Usage:
+```bash
+# Terminal 1: Start the overlay server
+npm run alerts
+
+# Terminal 2: Send messages
+npm run obs say "Hello chat!"        # Butler posts to REAL Twitch chat
+npm run obs chat "Test" -u TestUser  # Test message to overlay only
+```
+
+### Butler Bot (butlerbotphilo)
+The butler is an AI assistant bot that posts to real Twitch chat:
+- Account: butlerbotphilo (must follow channel + be modded)
+- Credentials: ~/twitch-secrets/.env (BOT_ACCESS_TOKEN, BOT_REFRESH_TOKEN)
+- Character guide: ~/butlerbotphilo/CLAUDE.md
+- Command: `npm run obs say "message"`
+
+### Chat CLI options:
+```bash
+npm run obs say "<message>"         # Butler posts to Twitch chat
+npm run obs chat "<message>"        # Test message to overlay only
+npm run obs chat "Hi" -u <name>     # Test as specific username
+npm run obs chat "Hi" -c "#FF0000"  # Set username color (hex)
+npm run obs chat "Hi" -b moderator  # Add badge
+```
+
+### Chat display features:
+- Persistent chatbox (bottom-right, messages stay visible)
+- Username colors from Twitch
+- Badges: broadcaster, moderator, VIP, subscriber
+- Max 50 messages before oldest removed
+- Auto-scrolls to newest
+
+### Files:
+- `overlay/modules/chat.js` - Chat display module
+- `overlay/server.js` - Twitch IRC + bot connections
+- `~/butlerbotphilo/CLAUDE.md` - Butler personality guide
 
 ## Troubleshooting WiFi/Network Issues
 

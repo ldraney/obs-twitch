@@ -528,6 +528,75 @@ program
     }
   });
 
+// Chat - send test chat message to overlay only
+program
+  .command('chat <message>')
+  .description('Send a test chat message to the overlay (not to Twitch)')
+  .option('-u, --user <name>', 'Username to display', 'ClaudeBot')
+  .option('-c, --color <hex>', 'Username color (hex)', '#9146FF')
+  .option('-b, --badges <list>', 'Badges (broadcaster,moderator,vip,subscriber)', '')
+  .action(async (message, options) => {
+    const WebSocket = require('ws');
+
+    const badges = options.badges ? options.badges.split(',').map(b => b.trim()) : [];
+
+    const event = {
+      type: 'chat',
+      username: options.user,
+      message: message,
+      color: options.color,
+      badges: badges,
+    };
+
+    try {
+      const ws = new WebSocket('ws://localhost:8080');
+
+      ws.on('open', () => {
+        console.log(chalk.cyan(`💬 ${options.user}: ${message}`));
+        ws.send(JSON.stringify(event));
+        setTimeout(() => {
+          ws.close();
+          console.log(chalk.green('✅ Sent to overlay!'));
+        }, 100);
+      });
+
+      ws.on('error', () => {
+        console.error(chalk.red('❌ Could not connect to overlay server'));
+        console.log(chalk.yellow('   Start it first: npm run obs overlay-server'));
+      });
+    } catch (error) {
+      console.error(chalk.red('Failed:'), error.message);
+    }
+  });
+
+// Say - send message to actual Twitch chat
+program
+  .command('say <message>')
+  .description('Send a message to Twitch chat (appears in real chat)')
+  .action(async (message) => {
+    const WebSocket = require('ws');
+
+    try {
+      const ws = new WebSocket('ws://localhost:8080');
+
+      ws.on('open', () => {
+        console.log(chalk.magenta(`📤 Sending to Twitch: ${message}`));
+        ws.send(JSON.stringify({ type: 'send', message }));
+        setTimeout(() => {
+          ws.close();
+          console.log(chalk.green('✅ Sent to Twitch chat!'));
+        }, 100);
+      });
+
+      ws.on('error', () => {
+        console.error(chalk.red('❌ Could not connect to overlay server'));
+        console.log(chalk.yellow('   Start it first: npm run obs overlay-server'));
+      });
+    } catch (error) {
+      console.error(chalk.red('Failed:'), error.message);
+    }
+  });
+
 // Go Live - WiFi check + start stream
 program
   .command('go')
