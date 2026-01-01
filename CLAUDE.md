@@ -180,6 +180,49 @@ node src/cli.js overlay 0.7     # Set OBS-level opacity (0.0-1.0)
 - OBS downscales the whole canvas to output resolution
 - To resize/reposition, modify transform in src/cli.js `controlOverlay()` function
 
+## Celebration Overlay Setup
+
+Show confetti and animations when you get new followers, raids, or subscribers.
+
+### One-time setup:
+```bash
+npm run obs celebration create   # Adds Browser Source to OBS
+```
+
+This creates "Celebration Overlay" as a Browser Source pointing to `overlay/index.html`, scaled to fill your canvas (2560x1440), and positioned on top of other sources.
+
+### Usage:
+```bash
+# Terminal 1: Start the overlay server (connects to Twitch EventSub)
+npm run alerts
+
+# Terminal 2 (optional): Test it works
+npm run obs celebrate follow "TestUser"
+npm run obs celebrate raid "RaidLeader" -v 100
+npm run obs celebrate sub "NewSub" -m 3
+```
+
+### CLI commands:
+```bash
+npm run obs celebration create   # One-time setup (adds Browser Source to OBS)
+npm run obs celebration show     # Show the overlay
+npm run obs celebration hide     # Hide the overlay
+npm run obs celebration refresh  # Refresh browser (reconnect WebSocket)
+```
+
+### Files:
+- `overlay/index.html` - The overlay page (loaded by OBS Browser Source)
+- `overlay/server.js` - WebSocket server connecting Twitch EventSub to overlay
+- `overlay/modules/follow.js` - Confetti animation for follows
+- `overlay/modules/raid.js` - Viking animation for raids
+- `overlay/modules/subscribe.js` - Celebration for subs
+
+### Keyboard shortcuts (in browser):
+Press these keys when viewing `overlay/index.html` directly in a browser:
+- `F` - Test follow animation
+- `R` - Test raid animation
+- `S` - Test subscribe animation
+
 ## Troubleshooting WiFi/Network Issues
 
 High dropped frames (>5%) with low bitrate often indicates WiFi problems.

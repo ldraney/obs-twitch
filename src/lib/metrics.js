@@ -393,6 +393,103 @@ class OBSMetrics {
     return { action: 'opacity', name: overlay.sourceName, opacity };
   }
 
+  async controlCelebrationOverlay(action) {
+    await this.connect();
+    const sceneList = await this.obs.call('GetSceneList');
+    const currentScene = sceneList.currentProgramSceneName;
+    const items = await this.obs.call('GetSceneItemList', { sceneName: currentScene });
+
+    // Find celebration overlay source
+    let overlay = items.sceneItems.find(i =>
+      i.sourceName.toLowerCase().includes('celebration') ||
+      i.sourceName.toLowerCase().includes('follower')
+    );
+
+    // Create overlay if it doesn't exist
+    if (!overlay && action === 'create') {
+      const video = await this.obs.call('GetVideoSettings');
+      const baseWidth = video.baseWidth;
+      const baseHeight = video.baseHeight;
+
+      // Build file:// URL for overlay
+      const path = require('path');
+      const overlayPath = path.resolve(__dirname, '..', '..', 'overlay', 'index.html');
+      const fileUrl = `file:///${overlayPath.replace(/\\/g, '/')}`;
+
+      const result = await this.obs.call('CreateInput', {
+        sceneName: currentScene,
+        inputName: 'Celebration Overlay',
+        inputKind: 'browser_source',
+        inputSettings: {
+          url: fileUrl,
+          width: baseWidth,
+          height: baseHeight,
+          css: '',
+          shutdown: false,
+          restart_when_active: false
+        }
+      });
+
+      // Scale to fill the entire base canvas
+      await this.obs.call('SetSceneItemTransform', {
+        sceneName: currentScene,
+        sceneItemId: result.sceneItemId,
+        sceneItemTransform: {
+          positionX: 0,
+          positionY: 0,
+          boundsType: 'OBS_BOUNDS_SCALE_INNER',
+          boundsWidth: baseWidth,
+          boundsHeight: baseHeight,
+          boundsAlignment: 0
+        }
+      });
+
+      // Move to top of source list (render on top)
+      const updatedItems = await this.obs.call('GetSceneItemList', { sceneName: currentScene });
+      const maxIndex = Math.max(...updatedItems.sceneItems.map(i => i.sceneItemIndex));
+      await this.obs.call('SetSceneItemIndex', {
+        sceneName: currentScene,
+        sceneItemId: result.sceneItemId,
+        sceneItemIndex: maxIndex
+      });
+
+      return { created: true, name: 'Celebration Overlay', width: baseWidth, height: baseHeight, url: fileUrl };
+    }
+
+    if (!overlay) {
+      throw new Error('Celebration overlay not found. Run: npm run obs celebration create');
+    }
+
+    if (action === 'show') {
+      await this.obs.call('SetSceneItemEnabled', {
+        sceneName: currentScene,
+        sceneItemId: overlay.sceneItemId,
+        sceneItemEnabled: true
+      });
+      return { action: 'show', name: overlay.sourceName };
+    }
+
+    if (action === 'hide') {
+      await this.obs.call('SetSceneItemEnabled', {
+        sceneName: currentScene,
+        sceneItemId: overlay.sceneItemId,
+        sceneItemEnabled: false
+      });
+      return { action: 'hide', name: overlay.sourceName };
+    }
+
+    if (action === 'refresh') {
+      // Refresh browser source to reconnect WebSocket
+      await this.obs.call('PressInputPropertiesButton', {
+        inputName: overlay.sourceName,
+        propertyName: 'refreshnocache'
+      });
+      return { action: 'refresh', name: overlay.sourceName };
+    }
+
+    throw new Error('Invalid action. Use: create, show, hide, refresh');
+  }
+
   formatDuration(ms) {
     const seconds = Math.floor(ms / 1000);
     const hours = Math.floor(seconds / 3600);

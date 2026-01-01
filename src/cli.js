@@ -325,6 +325,35 @@ program
     }
   });
 
+// Celebration overlay (browser source for follower alerts)
+program
+  .command('celebration <action>')
+  .description('Control celebration overlay (create/show/hide/refresh)')
+  .action(async (action) => {
+    try {
+      const result = await obs.controlCelebrationOverlay(action);
+
+      if (result.created) {
+        console.log(chalk.green(`✓ Created "${result.name}"`));
+        console.log(`  Size: ${result.width}x${result.height}`);
+        console.log(`  URL: ${result.url}`);
+        console.log(chalk.cyan('\nNext steps:'));
+        console.log('  1. Start the overlay server: npm run alerts');
+        console.log('  2. Test with: npm run obs celebrate follow "YourName"');
+      } else if (result.action === 'show') {
+        console.log(chalk.green(`${result.name} SHOWN`));
+      } else if (result.action === 'hide') {
+        console.log(chalk.yellow(`${result.name} HIDDEN`));
+      } else if (result.action === 'refresh') {
+        console.log(chalk.green(`${result.name} REFRESHED`));
+      }
+    } catch (error) {
+      console.error(chalk.red('Failed:'), error.message);
+    } finally {
+      await obs.disconnect();
+    }
+  });
+
 // Monitor (live dashboard)
 program
   .command('monitor')
@@ -424,6 +453,76 @@ program
         console.log(chalk.cyan('  Try: Windows Settings > WiFi > Forget network > Reconnect'));
       }
 
+    } catch (error) {
+      console.error(chalk.red('Failed:'), error.message);
+    }
+  });
+
+// Overlay server
+program
+  .command('overlay-server')
+  .alias('alerts')
+  .description('Start the overlay WebSocket server for alerts')
+  .option('-t, --test', 'Send a test follow after starting')
+  .action(async (options) => {
+    const { spawn } = require('child_process');
+    const path = require('path');
+
+    const args = [path.join(__dirname, '..', 'overlay', 'server.js')];
+    if (options.test) args.push('--test');
+
+    console.log(chalk.bold('\n🎬 Starting Overlay Server...\n'));
+
+    const server = spawn('node', args, {
+      stdio: 'inherit',
+      cwd: path.join(__dirname, '..'),
+    });
+
+    server.on('error', (err) => {
+      console.error(chalk.red('Failed to start server:'), err.message);
+    });
+  });
+
+// Celebrate - trigger overlay effect
+program
+  .command('celebrate <type> [username]')
+  .alias('trigger')
+  .description('Trigger an overlay effect (follow, raid, subscribe)')
+  .option('-v, --viewers <count>', 'Viewer count for raids', '50')
+  .option('-m, --months <count>', 'Month count for subscriptions', '1')
+  .action(async (type, username, options) => {
+    const WebSocket = require('ws');
+
+    const events = {
+      follow: { type: 'follow', username: username || 'TestFollower' },
+      raid: { type: 'raid', username: username || 'RaidLeader', viewers: parseInt(options.viewers) },
+      subscribe: { type: 'subscribe', username: username || 'NewSub', months: parseInt(options.months) },
+      sub: { type: 'subscribe', username: username || 'NewSub', months: parseInt(options.months) },
+    };
+
+    const event = events[type];
+    if (!event) {
+      console.error(chalk.red(`Unknown event type: ${type}`));
+      console.log('Available: follow, raid, subscribe');
+      return;
+    }
+
+    try {
+      const ws = new WebSocket('ws://localhost:8080');
+
+      ws.on('open', () => {
+        console.log(chalk.green(`🎉 Triggering ${type}: ${event.username}`));
+        ws.send(JSON.stringify(event));
+        setTimeout(() => {
+          ws.close();
+          console.log(chalk.green('✅ Event sent!'));
+        }, 100);
+      });
+
+      ws.on('error', () => {
+        console.error(chalk.red('❌ Could not connect to overlay server'));
+        console.log(chalk.yellow('   Start it first: npm run obs overlay-server'));
+      });
     } catch (error) {
       console.error(chalk.red('Failed:'), error.message);
     }
