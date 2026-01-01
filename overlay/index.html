@@ -238,6 +238,7 @@
     import * as followEffect from './modules/follow.js';
     import * as raidEffect from './modules/raid.js';
     import * as subscribeEffect from './modules/subscribe.js';
+    import * as audio from './modules/audio.js';
 
     // ============================================
     // CANVAS SETUP
@@ -259,18 +260,22 @@
       follow: {
         container: document.getElementById('follow-celebration'),
         trigger: followEffect.trigger,
+        sound: audio.playFollowSound,
       },
       raid: {
         container: document.getElementById('raid-alert'),
         trigger: raidEffect.trigger,
+        sound: audio.playRaidSound,
       },
       subscribe: {
         container: document.getElementById('subscribe-alert'),
         trigger: subscribeEffect.trigger,
+        sound: audio.playSubSound,
       },
       sub: {
         container: document.getElementById('subscribe-alert'),
         trigger: subscribeEffect.trigger,
+        sound: audio.playSubSound,
       },
     };
 
@@ -282,6 +287,9 @@
       if (effect) {
         console.log(`🎬 Triggering effect: ${event.type}`, event);
         effect.trigger(canvas, ctx, effect.container, event);
+        if (effect.sound) {
+          effect.sound();
+        }
       } else {
         console.warn(`Unknown effect type: ${event.type}`);
       }
