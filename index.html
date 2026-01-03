@@ -66,7 +66,9 @@
       breathLFO.connect(master.gain);
 
       // Master effects chain
-      const reverb = new Tone.Reverb({ decay: 3, wet: 0.3 }).connect(master);
+      const reverb = new Tone.Reverb({ decay: 3, wet: 0.3 });
+      await reverb.generate();  // Reverb needs async init
+      reverb.connect(master);
       const delay = new Tone.FeedbackDelay('8n.', 0.3).connect(reverb);
       delay.wet.value = 0.2;
 
