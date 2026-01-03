@@ -40,6 +40,44 @@ slight sharpening.
 - `~/twitch-secrets/.env` - Twitch API credentials (separate private repo)
 - `data/streams.db` - SQLite database (gitignored)
 
+## Development Workflow
+
+Use git worktrees to work on issues. Each issue gets its own directory.
+
+### Structure
+```
+~/obs-twitch/              # main repo (master) - production code
+~/worktrees/twitch-<N>/    # worktree for issue #N
+```
+
+### Commands
+```bash
+# Create worktree for new issue
+cd ~/obs-twitch
+git worktree add -b issue-<N>-description ~/worktrees/twitch-<N>
+
+# List all worktrees
+git worktree list
+
+# Work on an issue
+cd ~/worktrees/twitch-<N>
+# ... make changes, commit ...
+git push -u origin issue-<N>-description
+
+# Create PR from branch
+gh pr create --base master
+
+# After PR merged, cleanup
+git worktree remove ~/worktrees/twitch-<N>
+git branch -d issue-<N>-description
+```
+
+### Rules
+1. **Always create an issue first** before modifying the repo
+2. **One worktree per issue** - keeps work isolated
+3. **PRs to master** - no direct commits to master
+4. **Delete worktree after merge** - keep things clean
+
 ## Commands
 ```bash
 # Stream control
