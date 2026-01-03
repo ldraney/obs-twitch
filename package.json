@@ -17,6 +17,10 @@
     "affiliate": "node src/cli.js affiliate",
     "alerts": "node src/cli.js overlay-server",
     "celebrate": "node src/cli.js celebrate",
+    "lofi": "node lofi/cli.js",
+    "lofi:start": "node lofi/cli.js start",
+    "lofi:stop": "node lofi/cli.js stop",
+    "lofi:vol": "node lofi/cli.js volume",
     "test:follow": "node tests/follow.js",
     "test:raid": "node tests/raid.js",
     "test:sub": "node tests/sub.js"
@@ -27,6 +31,7 @@
     "commander": "^12.1.0",
     "dotenv": "^16.3.1",
     "ink": "^3.2.0",
+    "loudness": "^0.4.2",
     "obs-websocket-js": "^5.0.6",
     "react": "^17.0.2",
     "ws": "^8.18.3"
