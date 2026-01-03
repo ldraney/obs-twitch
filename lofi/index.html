@@ -26,6 +26,7 @@
       margin: 10px;
     }
     button:hover { background: #ff6b6b; }
+    button:disabled { background: #666; cursor: not-allowed; }
     #status { margin-top: 20px; font-size: 18px; }
   </style>
 </head>
@@ -36,183 +37,115 @@
   <div id="status">Click Start to play</div>
 
   <script>
-    // Richer jazz chords with extensions
+    // Jazzy chords
     const chords = [
-      ['D2', 'A2', 'C3', 'E3', 'F3'],      // Dm9
-      ['G2', 'D3', 'F3', 'A3', 'B3'],      // G13
-      ['C2', 'G2', 'B2', 'D3', 'E3'],      // Cmaj9
-      ['A2', 'E3', 'G3', 'B3', 'D4'],      // Am9
-      ['F2', 'C3', 'E3', 'G3', 'A3'],      // Fmaj9
-      ['E2', 'B2', 'D3', 'G3', 'A3'],      // Em11
+      ['D3', 'F3', 'A3', 'C4', 'E4'],
+      ['G3', 'B3', 'D4', 'F4', 'A4'],
+      ['C3', 'E3', 'G3', 'B3', 'D4'],
+      ['A2', 'C3', 'E3', 'G3', 'B3'],
+      ['F3', 'A3', 'C4', 'E4', 'G4'],
+      ['E3', 'G3', 'B3', 'D4', 'F4'],
     ];
 
-    const bassNotes = ['D2', 'G2', 'C2', 'A1', 'F2', 'E2'];
-
     let playing = false;
+    let synth, bass, kick, hihat, noise, loops = [];
 
     async function startLofi() {
-      await Tone.start();
+      try {
+        await Tone.start();
+        document.getElementById('status').textContent = 'Loading...';
 
-      // Master volume (~10% - perfect background music level)
-      // Site always outputs at this level, user controls their system volume
-      const master = new Tone.Gain(0.1).toDestination();
+        // Simple master volume at 10%
+        const vol = new Tone.Volume(-20).toDestination();
 
-      // Slow breathing volume LFO - gentle swells around 10%
-      const breathLFO = new Tone.LFO({
-        frequency: 0.08,   // ~12 sec cycle
-        min: 0.08,
-        max: 0.12
-      }).start();
-      breathLFO.connect(master.gain);
+        // Rhodes-like synth
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'triangle' },
+          envelope: { attack: 0.1, decay: 0.3, sustain: 0.5, release: 1 }
+        }).connect(vol);
 
-      // Master effects chain
-      const reverb = new Tone.Reverb({ decay: 3, wet: 0.3 });
-      await reverb.generate();  // Reverb needs async init
-      reverb.connect(master);
-      const delay = new Tone.FeedbackDelay('8n.', 0.3).connect(reverb);
-      delay.wet.value = 0.2;
+        // Bass
+        bass = new Tone.Synth({
+          oscillator: { type: 'triangle' },
+          envelope: { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.5 }
+        }).connect(vol);
 
-      // Lowpass for lofi warmth
-      const lopass = new Tone.Filter(2500, 'lowpass').connect(delay);
+        // Kick
+        kick = new Tone.MembraneSynth().connect(vol);
 
-      // Bitcrusher for that dusty feel
-      const crusher = new Tone.BitCrusher(8).connect(lopass);
+        // Hihat
+        hihat = new Tone.NoiseSynth({
+          noise: { type: 'white' },
+          envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 }
+        }).connect(vol);
 
-      // Warm Rhodes-like EP
-      const ep = new Tone.PolySynth(Tone.FMSynth, {
-        harmonicity: 2,
-        modulationIndex: 1.5,
-        oscillator: { type: 'sine' },
-        envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 1.5 },
-        modulation: { type: 'triangle' },
-        modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.5 }
-      }).connect(crusher);
-      ep.volume.value = -14;
+        // Vinyl noise
+        noise = new Tone.Noise('brown').connect(vol);
+        noise.volume.value = -35;
+        noise.start();
 
-      // Sub bass
-      const bass = new Tone.MonoSynth({
-        oscillator: { type: 'triangle' },
-        envelope: { attack: 0.05, decay: 0.3, sustain: 0.7, release: 0.5 },
-        filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.5, release: 0.5, baseFrequency: 200, octaves: 2 }
-      }).connect(lopass);
-      bass.volume.value = -10;
+        Tone.Transport.bpm.value = 72;
+        Tone.Transport.swing = 0.2;
 
-      // Vinyl crackle + hiss
-      const noise = new Tone.Noise('brown').start();
-      const noiseFilter = new Tone.Filter(1000, 'lowpass').toDestination();
-      noise.connect(noiseFilter);
-      noise.volume.value = -30;
+        let chordIdx = 0;
 
-      // Crackle pops
-      const crackle = new Tone.Noise('white');
-      const crackleEnv = new Tone.AmplitudeEnvelope({ attack: 0.001, decay: 0.02, sustain: 0, release: 0.01 }).toDestination();
-      crackle.connect(crackleEnv);
-      crackle.start();
-      crackleEnv.volume.value = -25;
+        // Chord loop
+        const chordLoop = new Tone.Loop((time) => {
+          synth.triggerAttackRelease(chords[chordIdx], '2n', time, 0.3);
+          bass.triggerAttackRelease(chords[chordIdx][0].replace(/[0-9]/, '2'), '2n', time, 0.5);
+          chordIdx = (chordIdx + 1) % chords.length;
+        }, '2n').start(0);
+        loops.push(chordLoop);
 
-      // Drums with swing
-      Tone.Transport.swing = 0.3;
-      Tone.Transport.swingSubdivision = '16n';
+        // Kick on 1 and 3
+        const kickLoop = new Tone.Loop((time) => {
+          kick.triggerAttackRelease('C1', '8n', time, 0.8);
+        }, '2n').start(0);
+        loops.push(kickLoop);
 
-      const kick = new Tone.MembraneSynth({
-        pitchDecay: 0.08,
-        octaves: 6,
-        envelope: { attack: 0.001, decay: 0.25, sustain: 0, release: 0.4 }
-      }).connect(lopass);
-      kick.volume.value = -6;
+        // Hihat
+        const hatLoop = new Tone.Loop((time) => {
+          hihat.triggerAttackRelease('16n', time, 0.3);
+        }, '8n').start('8n');
+        loops.push(hatLoop);
 
-      const snare = new Tone.NoiseSynth({
-        noise: { type: 'white' },
-        envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.1 }
-      }).connect(lopass);
-      snare.volume.value = -12;
+        Tone.Transport.start();
 
-      const hihat = new Tone.MetalSynth({
-        frequency: 300,
-        envelope: { attack: 0.001, decay: 0.06, release: 0.01 },
-        harmonicity: 5.1,
-        modulationIndex: 32,
-        resonance: 4000,
-        octaves: 1
-      }).connect(lopass);
-      hihat.volume.value = -22;
-
-      // Shaker
-      const shaker = new Tone.NoiseSynth({
-        noise: { type: 'pink' },
-        envelope: { attack: 0.005, decay: 0.05, sustain: 0, release: 0.03 }
-      }).connect(lopass);
-      shaker.volume.value = -24;
-
-      Tone.Transport.bpm.value = 72;
-
-      let chordIndex = 0;
-
-      // Chord progression with humanization
-      new Tone.Loop((time) => {
-        const chord = chords[chordIndex];
-        // Stagger notes slightly for human feel
-        chord.forEach((note, i) => {
-          const offset = i * 0.02 + Math.random() * 0.01;
-          const vel = 0.4 + Math.random() * 0.2;
-          ep.triggerAttackRelease(note, '2n', time + offset, vel);
-        });
-
-        // Bass follows root
-        bass.triggerAttackRelease(bassNotes[chordIndex], '2n', time + 0.01, 0.7);
-
-        chordIndex = (chordIndex + 1) % chords.length;
-      }, '2n').start(0);
-
-      // Kick pattern - boom bap
-      new Tone.Sequence((time, note) => {
-        if (note) kick.triggerAttackRelease('C1', '8n', time, 0.8 + Math.random() * 0.2);
-      }, [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0], '16n').start(0);
-
-      // Snare on 2 and 4
-      new Tone.Sequence((time, note) => {
-        if (note) snare.triggerAttackRelease('8n', time, 0.5 + Math.random() * 0.2);
-      }, [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0], '16n').start(0);
-
-      // Hihat pattern with ghost notes
-      new Tone.Sequence((time, vel) => {
-        if (vel > 0) hihat.triggerAttackRelease('32n', time, vel * (0.8 + Math.random() * 0.4));
-      }, [0.6, 0.2, 0.4, 0.2, 0.6, 0.2, 0.5, 0.3, 0.6, 0.2, 0.4, 0.2, 0.6, 0.2, 0.5, 0.2], '16n').start(0);
-
-      // Shaker fills
-      new Tone.Loop((time) => {
-        if (Math.random() > 0.6) {
-          shaker.triggerAttackRelease('16n', time, 0.3 + Math.random() * 0.3);
-        }
-      }, '16n').start(0);
-
-      // Random vinyl crackle
-      new Tone.Loop((time) => {
-        if (Math.random() > 0.85) {
-          crackleEnv.triggerAttack(time);
-        }
-      }, '32n').start(0);
-
-      Tone.Transport.start();
-      playing = true;
-      document.getElementById('status').textContent = 'Playing lofi beats...';
-      document.getElementById('start').disabled = true;
-      document.getElementById('stop').disabled = false;
+        playing = true;
+        document.getElementById('status').textContent = 'Playing lofi beats...';
+        document.getElementById('start').disabled = true;
+        document.getElementById('stop').disabled = false;
+      } catch (e) {
+        document.getElementById('status').textContent = 'Error: ' + e.message;
+        console.error(e);
+      }
     }
 
     function stopLofi() {
       Tone.Transport.stop();
-      Tone.Transport.cancel();
+      loops.forEach(l => l.dispose());
+      loops = [];
+      if (synth) synth.dispose();
+      if (bass) bass.dispose();
+      if (kick) kick.dispose();
+      if (hihat) hihat.dispose();
+      if (noise) { noise.stop(); noise.dispose(); }
+
       playing = false;
       document.getElementById('status').textContent = 'Stopped';
       document.getElementById('start').disabled = false;
       document.getElementById('stop').disabled = true;
-      // Reload to clean up all nodes
-      setTimeout(() => location.reload(), 100);
     }
 
     document.getElementById('start').addEventListener('click', startLofi);
     document.getElementById('stop').addEventListener('click', stopLofi);
+
+    // Auto-start on page load
+    window.addEventListener('load', () => {
+      startLofi().catch(() => {
+        document.getElementById('status').textContent = 'Click Start to play (autoplay blocked)';
+      });
+    });
   </script>
 </body>
 </html>
