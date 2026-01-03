@@ -139,6 +139,13 @@
 
     document.getElementById('start').addEventListener('click', startLofi);
     document.getElementById('stop').addEventListener('click', stopLofi);
+
+    // Auto-start on page load
+    window.addEventListener('load', () => {
+      startLofi().catch(() => {
+        document.getElementById('status').textContent = 'Click Start to play (autoplay blocked)';
+      });
+    });
   </script>
 </body>
 </html>
