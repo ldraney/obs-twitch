@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>What Makes Lofi - Demo</title>
+  <script src="https://unpkg.com/tone@14"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { color: #e94560; margin-bottom: 10px; }
+    .subtitle { color: #888; margin-bottom: 30px; }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 30px 0;
+    }
+    .panel {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 20px;
+      border: 2px solid transparent;
+      transition: border-color 0.3s;
+    }
+    .panel.active { border-color: #e94560; }
+    .panel h2 { margin-top: 0; }
+    .panel.clean h2 { color: #4ecdc4; }
+    .panel.lofi h2 { color: #e94560; }
+
+    button {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      font-size: 18px;
+      cursor: pointer;
+      border-radius: 8px;
+      margin: 5px;
+      transition: transform 0.1s, background 0.2s;
+    }
+    button:hover { background: #ff6b6b; transform: scale(1.02); }
+    button:active { transform: scale(0.98); }
+    button:disabled { background: #444; cursor: not-allowed; transform: none; }
+    button.clean-btn { background: #4ecdc4; }
+    button.clean-btn:hover { background: #6ee7df; }
+
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 15px 0;
+    }
+    .feature-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      justify-content: space-between;
+    }
+    .feature-list .label { color: #888; }
+    .feature-list .value { color: #fff; font-weight: bold; }
+
+    .controls {
+      text-align: center;
+      margin: 30px 0;
+    }
+
+    .explanation {
+      background: rgba(233, 69, 96, 0.1);
+      border-left: 4px solid #e94560;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    #status {
+      text-align: center;
+      padding: 10px;
+      color: #888;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>What Makes Lofi?</h1>
+    <p class="subtitle">Hear the same chord progression - clean vs lofi</p>
+
+    <div class="comparison">
+      <div class="panel clean" id="cleanPanel">
+        <h2>Clean Version</h2>
+        <ul class="feature-list">
+          <li><span class="label">Timing</span><span class="value">Perfect grid</span></li>
+          <li><span class="label">Swing</span><span class="value">0%</span></li>
+          <li><span class="label">Reverb</span><span class="value">None</span></li>
+          <li><span class="label">Texture</span><span class="value">None</span></li>
+          <li><span class="label">Velocity</span><span class="value">Constant</span></li>
+        </ul>
+        <button class="clean-btn" id="playClean">Play Clean</button>
+      </div>
+
+      <div class="panel lofi" id="lofiPanel">
+        <h2>Lofi Version</h2>
+        <ul class="feature-list">
+          <li><span class="label">Timing</span><span class="value">Human feel</span></li>
+          <li><span class="label">Swing</span><span class="value">20%</span></li>
+          <li><span class="label">Reverb</span><span class="value">Large room</span></li>
+          <li><span class="label">Texture</span><span class="value">Vinyl noise</span></li>
+          <li><span class="label">Velocity</span><span class="value">Varies</span></li>
+        </ul>
+        <button id="playLofi">Play Lofi</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="stop" disabled>Stop</button>
+    </div>
+
+    <div class="explanation">
+      <strong>What you're hearing:</strong> The exact same Dm7 → G7 → Cmaj7 → Am7 progression.
+      The lofi version adds swing, reverb, vinyl texture, and velocity variation.
+      Same notes, completely different vibe.
+    </div>
+
+    <div id="status">Click a button to start</div>
+  </div>
+
+  <script>
+    // Chord progression (same for both)
+    const chords = [
+      ['D3', 'F3', 'A3', 'C4'],  // Dm7
+      ['G3', 'B3', 'D4', 'F4'],  // G7
+      ['C3', 'E3', 'G3', 'B3'],  // Cmaj7
+      ['A2', 'C3', 'E3', 'G3'],  // Am7
+    ];
+
+    let currentMode = null;
+    let synth, kick, noise, reverb, loops = [];
+
+    async function playClean() {
+      await Tone.start();
+      stopAll();
+      currentMode = 'clean';
+      document.getElementById('cleanPanel').classList.add('active');
+      document.getElementById('lofiPanel').classList.remove('active');
+      document.getElementById('status').textContent = 'Playing clean version...';
+      document.getElementById('stop').disabled = false;
+
+      // Simple, clean synth
+      synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 0.3 }
+      }).toDestination();
+      synth.volume.value = -12;
+
+      kick = new Tone.MembraneSynth().toDestination();
+      kick.volume.value = -8;
+
+      Tone.Transport.bpm.value = 75;
+      Tone.Transport.swing = 0; // NO swing
+
+      let idx = 0;
+      const chordLoop = new Tone.Loop((time) => {
+        synth.triggerAttackRelease(chords[idx], '2n', time, 0.5); // Constant velocity
+        idx = (idx + 1) % chords.length;
+      }, '2n').start(0);
+      loops.push(chordLoop);
+
+      const kickLoop = new Tone.Loop((time) => {
+        kick.triggerAttackRelease('C1', '8n', time, 0.7);
+      }, '2n').start(0);
+      loops.push(kickLoop);
+
+      Tone.Transport.start();
+    }
+
+    async function playLofi() {
+      await Tone.start();
+      stopAll();
+      currentMode = 'lofi';
+      document.getElementById('lofiPanel').classList.add('active');
+      document.getElementById('cleanPanel').classList.remove('active');
+      document.getElementById('status').textContent = 'Playing lofi version...';
+      document.getElementById('stop').disabled = false;
+
+      // Reverb for space
+      reverb = new Tone.Reverb({ decay: 3, wet: 0.4 }).toDestination();
+      await reverb.generate();
+
+      // Warm synth through reverb
+      synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.1, decay: 0.3, sustain: 0.4, release: 1.2 }
+      }).connect(reverb);
+      synth.volume.value = -12;
+
+      kick = new Tone.MembraneSynth().toDestination();
+      kick.volume.value = -10;
+
+      // Vinyl noise
+      noise = new Tone.Noise('brown').toDestination();
+      noise.volume.value = -32;
+      noise.start();
+
+      Tone.Transport.bpm.value = 75;
+      Tone.Transport.swing = 0.2; // 20% swing
+
+      let idx = 0;
+      const chordLoop = new Tone.Loop((time) => {
+        // Varying velocity for human feel
+        const vel = 0.3 + Math.random() * 0.3;
+        synth.triggerAttackRelease(chords[idx], '2n', time, vel);
+        idx = (idx + 1) % chords.length;
+      }, '2n').start(0);
+      loops.push(chordLoop);
+
+      const kickLoop = new Tone.Loop((time) => {
+        const vel = 0.6 + Math.random() * 0.2;
+        kick.triggerAttackRelease('C1', '8n', time, vel);
+      }, '2n').start(0);
+      loops.push(kickLoop);
+
+      Tone.Transport.start();
+    }
+
+    function stopAll() {
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      loops.forEach(l => l.dispose());
+      loops = [];
+      if (synth) { synth.dispose(); synth = null; }
+      if (kick) { kick.dispose(); kick = null; }
+      if (noise) { noise.stop(); noise.dispose(); noise = null; }
+      if (reverb) { reverb.dispose(); reverb = null; }
+
+      document.getElementById('cleanPanel').classList.remove('active');
+      document.getElementById('lofiPanel').classList.remove('active');
+      document.getElementById('status').textContent = 'Stopped';
+      document.getElementById('stop').disabled = true;
+      currentMode = null;
+    }
+
+    document.getElementById('playClean').addEventListener('click', playClean);
+    document.getElementById('playLofi').addEventListener('click', playLofi);
+    document.getElementById('stop').addEventListener('click', stopAll);
+  </script>
+</body>
+</html>

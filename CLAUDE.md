@@ -347,3 +347,73 @@ ping -n 5 10.0.0.1             # Test latency (should be <5ms)
 - OBS must have WebSocket Server enabled (Tools > WebSocket Server Settings)
 - Game capture may not work with anti-cheat; use Window Capture instead
 - Window Capture source at 1:1 scale (OBS handles downscale to 936p)
+
+---
+
+## Lofi Music Development (Issue #15)
+
+Learning system for creating lofi beats with Tone.js. Obsidian vault + interactive demos.
+
+### Locations
+- **Docs**: `~/lofi-development-docs/` (Obsidian vault)
+- **Demos**: `lofi/demos/*.html` (interactive HTML)
+- **Original generator**: `lofi/index.html`
+
+### Progress Tracker
+- [x] Phase 1: Foundations (what-makes-lofi, tone-js-basics, audio-signal-flow, glossary)
+- [x] Phase 2: Sound Sources (oscillators, synthesis-types, samplers)
+- [x] Phase 3: Effects (reverb, delay, filters, distortion, effects-chain)
+- [x] Phase 4: Rhythm (tempo-and-time, drum-patterns, swing, ghost-notes)
+- [x] Phase 5: Harmony (chord-theory, chord-progressions, bass-lines)
+- [x] Phase 6: Dynamics (lfos, automation, humanization)
+- [x] Phase 7: Arrangement (song-structure, builds-and-drops, transitions)
+- [x] Phase 8: Projects (simple-beat, dusty-chords, groove-master, living-sound, epic-song)
+- [x] Phase 9: Cheatsheets (tone-js-cheatsheet, lofi-recipes)
+
+### Audio Initialization Pattern (IMPORTANT)
+Synths MUST be created AFTER `Tone.start()` is called. The working pattern:
+```javascript
+async function startAudio() {
+  await Tone.start();           // 1. Start audio context FIRST
+  synth = new Tone.Synth()...   // 2. THEN create synths
+  loop = new Tone.Loop...       // 3. Create loops
+  Tone.Transport.start();       // 4. Start playback
+}
+```
+
+### Known Bug: Tone.Sequence Timing Errors (Issue #16)
+**Status:** `03-groove-master.html` throws timing errors on play.
+**Error:** "The time must be greater than or equal to the last scheduled time"
+**Workaround:** Use `Tone.Loop` instead of `Tone.Sequence` (see `lofi/index.html`)
+
+### Doc Template (Obsidian with full features)
+```yaml
+---
+tags: [lofi, tone-js, <topic>]
+demo: ../../obs-twitch/lofi/demos/<name>.html
+related: [[other-doc]]
+---
+```
+
+### Demo Template
+- Dark theme matching vault aesthetic
+- Interactive controls (sliders, buttons)
+- Real-time audio with Tone.js
+- Status feedback
+
+### Key Concepts ("Gauges" to tweak)
+| Category | Parameters |
+|----------|------------|
+| Sound Sources | oscillator type, ADSR envelope |
+| Effects | reverb decay/wet, delay time/feedback, filter cutoff/resonance |
+| Rhythm | BPM (60-90), swing (0-0.5), velocity variation |
+| Dynamics | LFO rate/depth, automation curves |
+
+### What Makes Epic Lofi
+1. Vibe - consistent mood
+2. Groove - drums that make you nod
+3. Space - reverb/delay depth
+4. Texture - vinyl noise, warmth
+5. Movement - subtle changes over time
+6. Structure - journey from start to finish
+7. Ear candy - surprises that reward listening

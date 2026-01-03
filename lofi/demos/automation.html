@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Automation - Demo</title>
+  <script src="https://unpkg.com/tone@14"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #e94560; margin-bottom: 10px; }
+    h2 { color: #4ecdc4; margin-top: 30px; }
+    h3 { color: #888; margin-bottom: 10px; }
+    .subtitle { color: #888; margin-bottom: 30px; }
+
+    .section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 15px 0;
+    }
+
+    .control {
+      background: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .control label {
+      display: block;
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    .control .value {
+      color: #e94560;
+      font-weight: bold;
+      float: right;
+    }
+    .control input[type="range"] {
+      width: 100%;
+      margin-top: 5px;
+    }
+    .control select {
+      width: 100%;
+      padding: 8px;
+      background: #2a2a4e;
+      color: #eee;
+      border: 1px solid #444;
+      border-radius: 4px;
+    }
+
+    button {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      margin: 5px;
+      transition: transform 0.1s, background 0.2s;
+    }
+    button:hover { background: #ff6b6b; transform: scale(1.02); }
+    button:active { transform: scale(0.98); }
+    button:disabled { background: #444; cursor: not-allowed; transform: none; }
+    button.secondary {
+      background: #4ecdc4;
+    }
+    button.secondary:hover { background: #6ee7df; }
+    button.active {
+      background: #4ecdc4;
+      box-shadow: 0 0 15px rgba(78, 205, 196, 0.5);
+    }
+
+    .preset-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid #444;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+    .preset-btn:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    .info-box {
+      background: rgba(78, 205, 196, 0.1);
+      border-left: 4px solid #4ecdc4;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .info-box.tip {
+      background: rgba(233, 69, 96, 0.1);
+      border-left-color: #e94560;
+    }
+
+    #status {
+      text-align: center;
+      padding: 10px;
+      color: #888;
+      font-size: 14px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+
+    .curve-container {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    #curveCanvas {
+      width: 100%;
+      height: 200px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 8px;
+    }
+    .curve-labels {
+      display: flex;
+      justify-content: space-between;
+      color: #666;
+      font-size: 11px;
+      margin-top: 5px;
+    }
+
+    .parameter-selector {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 15px 0;
+    }
+    .param-btn {
+      background: rgba(255,255,255,0.1);
+      border: 2px solid #444;
+      padding: 10px 20px;
+      color: #888;
+    }
+    .param-btn.active {
+      background: rgba(233, 69, 96, 0.2);
+      border-color: #e94560;
+      color: #e94560;
+    }
+    .param-btn:hover {
+      border-color: #666;
+      transform: none;
+    }
+
+    .type-selector {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 15px 0;
+    }
+    .type-btn {
+      background: rgba(255,255,255,0.1);
+      border: 2px solid #444;
+      padding: 10px 20px;
+      color: #888;
+    }
+    .type-btn.active {
+      background: rgba(78, 205, 196, 0.2);
+      border-color: #4ecdc4;
+      color: #4ecdc4;
+    }
+    .type-btn:hover {
+      border-color: #666;
+      transform: none;
+    }
+
+    .current-value {
+      text-align: center;
+      font-size: 48px;
+      font-weight: bold;
+      color: #e94560;
+      padding: 20px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+    .current-value span {
+      font-size: 18px;
+      color: #888;
+    }
+
+    .presets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin: 15px 0;
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .comparison-box {
+      background: rgba(0,0,0,0.2);
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .comparison-box h3 {
+      color: #e94560;
+      margin-top: 0;
+      margin-bottom: 10px;
+    }
+    .comparison-box p {
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 15px;
+    }
+    .comparison-box.lfo h3 { color: #4ecdc4; }
+
+    @media (max-width: 600px) {
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Automation</h1>
+    <p class="subtitle">Change parameters over time for musical movement and impact</p>
+
+    <div id="status">Click "Start Audio" to begin</div>
+
+    <div class="section">
+      <h2>1. Interactive Automation</h2>
+      <p>Choose a parameter, set start/end values, and trigger automation to hear it in action.</p>
+
+      <div style="text-align: center; margin: 15px 0;">
+        <button id="startAudio">Start Audio</button>
+        <button id="stopAudio" disabled>Stop Audio</button>
+      </div>
+
+      <h3>Parameter to Automate</h3>
+      <div class="parameter-selector">
+        <button class="param-btn active" data-param="filter">Filter Cutoff</button>
+        <button class="param-btn" data-param="volume">Volume</button>
+        <button class="param-btn" data-param="reverb">Reverb Wet</button>
+      </div>
+
+      <h3>Automation Type</h3>
+      <div class="type-selector">
+        <button class="type-btn active" data-type="linear">Linear Ramp</button>
+        <button class="type-btn" data-type="exponential">Exponential Ramp</button>
+        <button class="type-btn" data-type="instant">Instant</button>
+      </div>
+
+      <div class="controls">
+        <div class="control">
+          <label>Start Value <span class="value" id="startVal">500 Hz</span></label>
+          <input type="range" id="startValue" min="0" max="100" value="20">
+        </div>
+        <div class="control">
+          <label>End Value <span class="value" id="endVal">4000 Hz</span></label>
+          <input type="range" id="endValue" min="0" max="100" value="80">
+        </div>
+        <div class="control">
+          <label>Duration <span class="value" id="durationVal">2.0 sec</span></label>
+          <input type="range" id="duration" min="0.1" max="8" step="0.1" value="2">
+        </div>
+      </div>
+
+      <div class="current-value">
+        <span id="currentLabel">Filter Cutoff</span><br>
+        <span id="currentValue">1500</span> <span id="currentUnit">Hz</span>
+      </div>
+
+      <div style="text-align: center; margin: 15px 0;">
+        <button id="triggerAutomation">Trigger Automation</button>
+        <button id="resetValue" class="secondary">Reset</button>
+      </div>
+
+      <div class="curve-container">
+        <h3>Automation Curve Preview</h3>
+        <canvas id="curveCanvas"></canvas>
+        <div class="curve-labels">
+          <span>Start</span>
+          <span>Time</span>
+          <span>End</span>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <strong>What you're seeing:</strong> The curve shows how the parameter will change over time.
+        Linear ramps change at a constant rate. Exponential ramps start slow and accelerate
+        (sounds more natural for frequency). Instant jumps to the target immediately.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>2. Presets</h2>
+      <p>Quick automation patterns commonly used in lofi production.</p>
+
+      <div class="presets-grid">
+        <button class="preset-btn" data-preset="sweepUp">Filter Sweep Up</button>
+        <button class="preset-btn" data-preset="sweepDown">Filter Sweep Down</button>
+        <button class="preset-btn" data-preset="fadeIn">Fade In</button>
+        <button class="preset-btn" data-preset="fadeOut">Fade Out</button>
+        <button class="preset-btn" data-preset="drop">The Drop</button>
+        <button class="preset-btn" data-preset="swell">Reverb Swell</button>
+      </div>
+
+      <div class="info-box tip">
+        <strong>Tip:</strong> The "Drop" preset combines a filter sweep up followed by an instant
+        drop to a muffled sound - a classic lofi/electronic music technique for creating impact.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>3. Automation vs. LFO</h2>
+      <p>Hear the difference between intentional automation and periodic LFO modulation.</p>
+
+      <div class="comparison">
+        <div class="comparison-box">
+          <h3>Automation</h3>
+          <p>One-time sweep: starts at one value, ends at another</p>
+          <button id="playAutomation">Play Sweep</button>
+        </div>
+
+        <div class="comparison-box lfo">
+          <h3>LFO</h3>
+          <p>Continuous wobble: repeats forever in a cycle</p>
+          <button id="playLFO" class="secondary">Start LFO</button>
+          <button id="stopLFO" class="secondary" disabled>Stop LFO</button>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <strong>When to use each:</strong><br>
+        <strong>Automation</strong> - Builds, drops, transitions, section changes. "This should happen NOW."<br>
+        <strong>LFO</strong> - Constant movement, vibrato, wobble effects. "This should always be moving."
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>4. Chained Automation</h2>
+      <p>Complex automation combining multiple ramps in sequence.</p>
+
+      <div style="text-align: center; margin: 15px 0;">
+        <button id="playChain">Play Rise-Hold-Fall</button>
+        <button id="playBuild" class="secondary">Play 8-Bar Build</button>
+      </div>
+
+      <div class="info-box">
+        <strong>Rise-Hold-Fall:</strong> Filter sweeps up (2s), holds at peak (1s), then drops back down (2s).<br>
+        <strong>8-Bar Build:</strong> Simulates a full build-up with filter, volume, and reverb automation.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global state
+    let audioStarted = false;
+    let isPlaying = false;
+    let currentParam = 'filter';
+    let automationType = 'linear';
+
+    // Audio nodes
+    let synth = null;
+    let filter = null;
+    let reverb = null;
+    let autoFilter = null;
+    let animationId = null;
+    let lfoRunning = false;
+
+    // Parameter ranges
+    const paramRanges = {
+      filter: { min: 100, max: 8000, unit: 'Hz', default: 1500 },
+      volume: { min: -40, max: 0, unit: 'dB', default: -12 },
+      reverb: { min: 0, max: 1, unit: '', default: 0.3 }
+    };
+
+    // Canvas setup
+    const canvas = document.getElementById('curveCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+      canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      drawCurve();
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Initialize audio
+    async function initAudio() {
+      await Tone.start();
+
+      filter = new Tone.Filter({
+        frequency: 1500,
+        type: 'lowpass',
+        rolloff: -12,
+        Q: 1
+      }).toDestination();
+
+      reverb = new Tone.Reverb(2.5);
+      await reverb.generate();
+      reverb.wet.value = 0.3;
+      reverb.connect(Tone.Destination);
+
+      synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.1, decay: 0.3, sustain: 0.6, release: 1 }
+      });
+      synth.volume.value = -12;
+      synth.connect(filter);
+      synth.connect(reverb);
+
+      // LFO-controlled filter for comparison
+      autoFilter = new Tone.AutoFilter({
+        frequency: 0.5,
+        baseFrequency: 400,
+        octaves: 4,
+        type: 'lowpass'
+      }).toDestination();
+
+      audioStarted = true;
+      updateStatus('Audio ready! Choose a parameter and trigger automation.');
+    }
+
+    function updateStatus(msg) {
+      document.getElementById('status').textContent = msg;
+    }
+
+    // Start/stop audio
+    document.getElementById('startAudio').addEventListener('click', async () => {
+      if (!audioStarted) {
+        await initAudio();
+      }
+      startPlaying();
+      document.getElementById('startAudio').disabled = true;
+      document.getElementById('stopAudio').disabled = false;
+    });
+
+    document.getElementById('stopAudio').addEventListener('click', () => {
+      stopPlaying();
+      document.getElementById('startAudio').disabled = false;
+      document.getElementById('stopAudio').disabled = true;
+    });
+
+    function startPlaying() {
+      if (isPlaying) return;
+      isPlaying = true;
+
+      // Play sustained chord
+      synth.triggerAttack(['C3', 'Eb3', 'G3', 'Bb3']);
+      startValueUpdate();
+    }
+
+    function stopPlaying() {
+      if (!isPlaying) return;
+      isPlaying = false;
+
+      synth.releaseAll();
+      stopValueUpdate();
+
+      // Stop LFO if running
+      if (lfoRunning) {
+        autoFilter.stop();
+        lfoRunning = false;
+        document.getElementById('playLFO').disabled = false;
+        document.getElementById('stopLFO').disabled = true;
+      }
+    }
+
+    // Parameter selection
+    document.querySelectorAll('.param-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.param-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentParam = btn.dataset.param;
+        updateSliderLabels();
+        updateCurrentValueDisplay();
+        drawCurve();
+      });
+    });
+
+    // Automation type selection
+    document.querySelectorAll('.type-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        automationType = btn.dataset.type;
+        drawCurve();
+      });
+    });
+
+    // Slider value mapping
+    function sliderToValue(sliderVal, param) {
+      const range = paramRanges[param];
+      if (param === 'filter') {
+        // Logarithmic for frequency
+        const minLog = Math.log(range.min);
+        const maxLog = Math.log(range.max);
+        return Math.exp(minLog + (sliderVal / 100) * (maxLog - minLog));
+      } else {
+        // Linear for others
+        return range.min + (sliderVal / 100) * (range.max - range.min);
+      }
+    }
+
+    function valueToSlider(value, param) {
+      const range = paramRanges[param];
+      if (param === 'filter') {
+        const minLog = Math.log(range.min);
+        const maxLog = Math.log(range.max);
+        return ((Math.log(value) - minLog) / (maxLog - minLog)) * 100;
+      } else {
+        return ((value - range.min) / (range.max - range.min)) * 100;
+      }
+    }
+
+    function formatValue(value, param) {
+      const range = paramRanges[param];
+      if (param === 'filter') {
+        return Math.round(value) + ' ' + range.unit;
+      } else if (param === 'volume') {
+        return value.toFixed(1) + ' ' + range.unit;
+      } else {
+        return (value * 100).toFixed(0) + '%';
+      }
+    }
+
+    function updateSliderLabels() {
+      const startSlider = document.getElementById('startValue').value;
+      const endSlider = document.getElementById('endValue').value;
+
+      const startVal = sliderToValue(startSlider, currentParam);
+      const endVal = sliderToValue(endSlider, currentParam);
+
+      document.getElementById('startVal').textContent = formatValue(startVal, currentParam);
+      document.getElementById('endVal').textContent = formatValue(endVal, currentParam);
+
+      // Update current value label
+      document.getElementById('currentLabel').textContent = {
+        filter: 'Filter Cutoff',
+        volume: 'Volume',
+        reverb: 'Reverb Wet'
+      }[currentParam];
+
+      document.getElementById('currentUnit').textContent = paramRanges[currentParam].unit;
+    }
+
+    // Slider event listeners
+    document.getElementById('startValue').addEventListener('input', () => {
+      updateSliderLabels();
+      drawCurve();
+    });
+
+    document.getElementById('endValue').addEventListener('input', () => {
+      updateSliderLabels();
+      drawCurve();
+    });
+
+    document.getElementById('duration').addEventListener('input', (e) => {
+      document.getElementById('durationVal').textContent = parseFloat(e.target.value).toFixed(1) + ' sec';
+    });
+
+    // Draw automation curve
+    function drawCurve() {
+      const width = canvas.offsetWidth;
+      const height = canvas.offsetHeight;
+
+      ctx.clearRect(0, 0, width, height);
+
+      const startSlider = parseFloat(document.getElementById('startValue').value);
+      const endSlider = parseFloat(document.getElementById('endValue').value);
+
+      // Normalize to 0-1 for drawing
+      const startY = 1 - (startSlider / 100);
+      const endY = 1 - (endSlider / 100);
+
+      const padding = 20;
+      const drawWidth = width - padding * 2;
+      const drawHeight = height - padding * 2;
+
+      // Draw grid
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = padding + (drawHeight * i / 4);
+        ctx.beginPath();
+        ctx.moveTo(padding, y);
+        ctx.lineTo(width - padding, y);
+        ctx.stroke();
+      }
+
+      // Draw curve
+      ctx.strokeStyle = '#e94560';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+
+      const steps = 100;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        let y;
+
+        if (automationType === 'linear') {
+          y = startY + (endY - startY) * t;
+        } else if (automationType === 'exponential') {
+          // Exponential curve
+          y = startY + (endY - startY) * (1 - Math.pow(1 - t, 3));
+        } else {
+          // Instant - step function
+          y = t < 0.02 ? startY : endY;
+        }
+
+        const x = padding + t * drawWidth;
+        const yPos = padding + y * drawHeight;
+
+        if (i === 0) {
+          ctx.moveTo(x, yPos);
+        } else {
+          ctx.lineTo(x, yPos);
+        }
+      }
+      ctx.stroke();
+
+      // Draw start/end markers
+      ctx.fillStyle = '#4ecdc4';
+      ctx.beginPath();
+      ctx.arc(padding, padding + startY * drawHeight, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(width - padding, padding + endY * drawHeight, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Labels
+      ctx.fillStyle = '#888';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(formatValue(sliderToValue(startSlider, currentParam), currentParam), padding + 12, padding + startY * drawHeight + 4);
+      ctx.textAlign = 'right';
+      ctx.fillText(formatValue(sliderToValue(endSlider, currentParam), currentParam), width - padding - 12, padding + endY * drawHeight + 4);
+    }
+
+    // Trigger automation
+    document.getElementById('triggerAutomation').addEventListener('click', async () => {
+      if (!audioStarted) {
+        await initAudio();
+      }
+
+      if (!isPlaying) {
+        startPlaying();
+        document.getElementById('startAudio').disabled = true;
+        document.getElementById('stopAudio').disabled = false;
+      }
+
+      const startVal = sliderToValue(document.getElementById('startValue').value, currentParam);
+      const endVal = sliderToValue(document.getElementById('endValue').value, currentParam);
+      const duration = parseFloat(document.getElementById('duration').value);
+
+      let param;
+      if (currentParam === 'filter') {
+        param = filter.frequency;
+      } else if (currentParam === 'volume') {
+        param = synth.volume;
+      } else {
+        param = reverb.wet;
+      }
+
+      // Cancel any pending automation
+      param.cancelScheduledValues(Tone.now());
+
+      // Set start value
+      param.setValueAtTime(startVal, Tone.now());
+
+      // Apply automation
+      if (automationType === 'linear') {
+        param.linearRampTo(endVal, duration);
+      } else if (automationType === 'exponential') {
+        if (currentParam === 'volume' && endVal <= -40) {
+          // Can't exponential ramp to 0 or negative, use linear
+          param.linearRampTo(endVal, duration);
+        } else {
+          param.exponentialRampTo(Math.max(endVal, 0.001), duration);
+        }
+      } else {
+        // Instant
+        param.setValueAtTime(endVal, Tone.now());
+      }
+
+      updateStatus(`Automation triggered: ${formatValue(startVal, currentParam)} -> ${formatValue(endVal, currentParam)} over ${duration}s`);
+    });
+
+    // Reset value
+    document.getElementById('resetValue').addEventListener('click', () => {
+      if (!filter) return;
+
+      const defaults = {
+        filter: 1500,
+        volume: -12,
+        reverb: 0.3
+      };
+
+      filter.frequency.cancelScheduledValues(Tone.now());
+      filter.frequency.value = defaults.filter;
+      synth.volume.cancelScheduledValues(Tone.now());
+      synth.volume.value = defaults.volume;
+      reverb.wet.cancelScheduledValues(Tone.now());
+      reverb.wet.value = defaults.reverb;
+
+      updateStatus('Parameters reset to defaults');
+    });
+
+    // Current value display update
+    let valueUpdateId = null;
+
+    function startValueUpdate() {
+      function update() {
+        if (!isPlaying || !filter) return;
+
+        let value;
+        if (currentParam === 'filter') {
+          value = filter.frequency.value;
+        } else if (currentParam === 'volume') {
+          value = synth.volume.value;
+        } else {
+          value = reverb.wet.value;
+        }
+
+        if (currentParam === 'filter') {
+          document.getElementById('currentValue').textContent = Math.round(value);
+        } else if (currentParam === 'volume') {
+          document.getElementById('currentValue').textContent = value.toFixed(1);
+        } else {
+          document.getElementById('currentValue').textContent = (value * 100).toFixed(0);
+        }
+
+        valueUpdateId = requestAnimationFrame(update);
+      }
+      update();
+    }
+
+    function stopValueUpdate() {
+      if (valueUpdateId) {
+        cancelAnimationFrame(valueUpdateId);
+        valueUpdateId = null;
+      }
+    }
+
+    function updateCurrentValueDisplay() {
+      if (!filter) {
+        document.getElementById('currentValue').textContent = paramRanges[currentParam].default;
+        return;
+      }
+
+      let value;
+      if (currentParam === 'filter') {
+        value = filter.frequency.value;
+        document.getElementById('currentValue').textContent = Math.round(value);
+      } else if (currentParam === 'volume') {
+        value = synth.volume.value;
+        document.getElementById('currentValue').textContent = value.toFixed(1);
+      } else {
+        value = reverb.wet.value;
+        document.getElementById('currentValue').textContent = (value * 100).toFixed(0);
+      }
+    }
+
+    // Presets
+    const presets = {
+      sweepUp: { param: 'filter', start: 10, end: 90, duration: 4, type: 'exponential' },
+      sweepDown: { param: 'filter', start: 90, end: 10, duration: 4, type: 'exponential' },
+      fadeIn: { param: 'volume', start: 0, end: 70, duration: 3, type: 'linear' },
+      fadeOut: { param: 'volume', start: 70, end: 0, duration: 3, type: 'linear' },
+      drop: { param: 'filter', start: 10, end: 95, duration: 4, type: 'exponential', chain: true },
+      swell: { param: 'reverb', start: 20, end: 90, duration: 4, type: 'linear' }
+    };
+
+    document.querySelectorAll('.preset-btn[data-preset]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const preset = presets[btn.dataset.preset];
+        if (!preset) return;
+
+        if (!audioStarted) {
+          await initAudio();
+        }
+
+        // Update UI
+        currentParam = preset.param;
+        automationType = preset.type;
+
+        document.querySelectorAll('.param-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.param === preset.param);
+        });
+        document.querySelectorAll('.type-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.type === preset.type);
+        });
+
+        document.getElementById('startValue').value = preset.start;
+        document.getElementById('endValue').value = preset.end;
+        document.getElementById('duration').value = preset.duration;
+        document.getElementById('durationVal').textContent = preset.duration.toFixed(1) + ' sec';
+
+        updateSliderLabels();
+        drawCurve();
+
+        // Start audio if needed
+        if (!isPlaying) {
+          startPlaying();
+          document.getElementById('startAudio').disabled = true;
+          document.getElementById('stopAudio').disabled = false;
+        }
+
+        // Apply preset
+        const startVal = sliderToValue(preset.start, preset.param);
+        const endVal = sliderToValue(preset.end, preset.param);
+
+        let param;
+        if (preset.param === 'filter') {
+          param = filter.frequency;
+        } else if (preset.param === 'volume') {
+          param = synth.volume;
+        } else {
+          param = reverb.wet;
+        }
+
+        param.cancelScheduledValues(Tone.now());
+        param.setValueAtTime(startVal, Tone.now());
+
+        if (preset.type === 'exponential') {
+          param.exponentialRampTo(Math.max(endVal, 0.001), preset.duration);
+        } else {
+          param.linearRampTo(endVal, preset.duration);
+        }
+
+        // Handle "drop" with chained automation
+        if (preset.chain) {
+          setTimeout(() => {
+            if (isPlaying) {
+              param.cancelScheduledValues(Tone.now());
+              param.setValueAtTime(200, Tone.now()); // Instant drop
+              updateStatus('DROP! Filter instantly cut to 200 Hz');
+            }
+          }, preset.duration * 1000);
+        }
+
+        updateStatus(`Preset applied: ${btn.textContent}`);
+      });
+    });
+
+    // Automation vs LFO comparison
+    let comparisonSynth = null;
+
+    document.getElementById('playAutomation').addEventListener('click', async () => {
+      if (!audioStarted) {
+        await initAudio();
+      }
+
+      // Create temporary synth for comparison
+      const tempFilter = new Tone.Filter(500, 'lowpass').toDestination();
+      const tempSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' }
+      }).connect(tempFilter);
+      tempSynth.volume.value = -15;
+
+      tempSynth.triggerAttack(['C3', 'Eb3', 'G3']);
+
+      // Automation sweep
+      tempFilter.frequency.exponentialRampTo(4000, 3);
+
+      setTimeout(() => {
+        tempSynth.releaseAll();
+        setTimeout(() => {
+          tempFilter.dispose();
+          tempSynth.dispose();
+        }, 1000);
+      }, 3500);
+
+      updateStatus('Playing automation: one-time filter sweep up');
+    });
+
+    document.getElementById('playLFO').addEventListener('click', async () => {
+      if (!audioStarted) {
+        await initAudio();
+      }
+
+      if (lfoRunning) return;
+
+      // Create synth connected to auto filter
+      comparisonSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' }
+      }).connect(autoFilter);
+      comparisonSynth.volume.value = -15;
+
+      autoFilter.start();
+      comparisonSynth.triggerAttack(['C3', 'Eb3', 'G3']);
+
+      lfoRunning = true;
+      document.getElementById('playLFO').disabled = true;
+      document.getElementById('stopLFO').disabled = false;
+
+      updateStatus('Playing LFO: continuous filter wobble');
+    });
+
+    document.getElementById('stopLFO').addEventListener('click', () => {
+      if (!lfoRunning) return;
+
+      autoFilter.stop();
+      if (comparisonSynth) {
+        comparisonSynth.releaseAll();
+        setTimeout(() => {
+          comparisonSynth.dispose();
+          comparisonSynth = null;
+        }, 1000);
+      }
+
+      lfoRunning = false;
+      document.getElementById('playLFO').disabled = false;
+      document.getElementById('stopLFO').disabled = true;
+
+      updateStatus('LFO stopped');
+    });
+
+    // Chained automation examples
+    document.getElementById('playChain').addEventListener('click', async () => {
+      if (!audioStarted) {
+        await initAudio();
+      }
+
+      const tempFilter = new Tone.Filter(800, 'lowpass').toDestination();
+      const tempSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' }
+      }).connect(tempFilter);
+      tempSynth.volume.value = -15;
+
+      tempSynth.triggerAttack(['C3', 'Eb3', 'G3', 'Bb3']);
+
+      const now = Tone.now();
+
+      // Rise (2s)
+      tempFilter.frequency.setValueAtTime(800, now);
+      tempFilter.frequency.exponentialRampTo(4000, 2, now);
+
+      // Hold (1s)
+      tempFilter.frequency.setValueAtTime(4000, now + 2);
+
+      // Fall (2s)
+      tempFilter.frequency.exponentialRampTo(800, 2, now + 3);
+
+      setTimeout(() => {
+        tempSynth.releaseAll();
+        setTimeout(() => {
+          tempFilter.dispose();
+          tempSynth.dispose();
+        }, 1000);
+      }, 5500);
+
+      updateStatus('Playing chained automation: Rise (2s) -> Hold (1s) -> Fall (2s)');
+    });
+
+    document.getElementById('playBuild').addEventListener('click', async () => {
+      if (!audioStarted) {
+        await initAudio();
+      }
+
+      const tempFilter = new Tone.Filter(600, 'lowpass').toDestination();
+      const tempReverb = new Tone.Reverb(2);
+      await tempReverb.generate();
+      tempReverb.wet.value = 0.2;
+      tempReverb.connect(Tone.Destination);
+
+      const tempSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' }
+      }).connect(tempFilter).connect(tempReverb);
+      tempSynth.volume.value = -18;
+
+      tempSynth.triggerAttack(['C3', 'Eb3', 'G3', 'Bb3']);
+
+      const now = Tone.now();
+
+      // 8-bar build (at 120bpm, 8 bars = 16 seconds, we'll use 8 seconds for demo)
+      // Filter sweep up
+      tempFilter.frequency.setValueAtTime(600, now);
+      tempFilter.frequency.exponentialRampTo(5000, 6, now);
+
+      // Volume swell
+      tempSynth.volume.setValueAtTime(-18, now);
+      tempSynth.volume.linearRampTo(-8, 6, now);
+
+      // Reverb increase
+      tempReverb.wet.setValueAtTime(0.2, now);
+      tempReverb.wet.linearRampTo(0.6, 6, now);
+
+      // THE DROP at 6 seconds
+      setTimeout(() => {
+        tempFilter.frequency.cancelScheduledValues(Tone.now());
+        tempFilter.frequency.setValueAtTime(400, Tone.now());
+        tempSynth.volume.cancelScheduledValues(Tone.now());
+        tempSynth.volume.setValueAtTime(-15, Tone.now());
+        tempReverb.wet.cancelScheduledValues(Tone.now());
+        tempReverb.wet.setValueAtTime(0.3, Tone.now());
+
+        updateStatus('DROP! All parameters cut back');
+
+        // Recover
+        tempFilter.frequency.exponentialRampTo(1500, 2);
+        tempSynth.volume.linearRampTo(-10, 1);
+      }, 6000);
+
+      setTimeout(() => {
+        tempSynth.releaseAll();
+        setTimeout(() => {
+          tempFilter.dispose();
+          tempReverb.dispose();
+          tempSynth.dispose();
+        }, 1000);
+      }, 9000);
+
+      updateStatus('Playing 8-bar build: Filter, Volume, and Reverb automation -> DROP');
+    });
+
+    // Initialize
+    updateSliderLabels();
+    drawCurve();
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      stopPlaying();
+      if (lfoRunning) {
+        autoFilter.stop();
+      }
+    });
+  </script>
+</body>
+</html>
