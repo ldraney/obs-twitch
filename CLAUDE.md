@@ -451,6 +451,19 @@ lofi/
 - `intensity` - Overall loudness (0-1)
 - `section` - Current song section
 
+**Testing (Playwright):**
+```bash
+npm run test:lofi          # Run all 39 tests
+npm run test:lofi:smoke    # Smoke tests only
+npm run test:lofi:headed   # See the browser
+npm run test:lofi:ui       # Playwright UI mode
+npm run test:lofi:update   # Update visual baselines
+```
+
+Tests cover: page load, ES modules, canvas rendering, play/stop, timeline, sliders, keyboard shortcuts, audio clipping.
+
 **Open Issues:**
 - #21: Refine canvas smoothness/FPS
 - #24: Decouple audio and visual systems (in progress)
+- #25: Playwright QA suite (done)
+- #26: CI integration for tests
