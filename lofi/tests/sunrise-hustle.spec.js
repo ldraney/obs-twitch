@@ -370,11 +370,13 @@ test.describe('Sunrise Hustle', () => {
     // Start playback
     const playButton = page.locator('button').first();
     await playButton.click();
-    await page.waitForTimeout(2000);
 
-    // Time should have progressed (not 0:00)
+    // Wait for playback to start and time to progress
+    // Use Playwright's built-in waiting for text change instead of fixed timeout
+    await expect(timeDisplay).not.toHaveText('0:00 / 3:16', { timeout: 5000 });
+
+    // Verify the format is correct (M:SS / 3:16)
     const timeText = await timeDisplay.textContent();
-    expect(timeText).not.toBe('0:00 / 3:16');
     expect(timeText).toMatch(/^\d:\d{2} \/ 3:16$/);
   });
 
