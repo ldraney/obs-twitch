@@ -416,7 +416,7 @@
       reverb.connect(masterFilter);
 
       // Delay (echoes in the night)
-      delay = new Tone.FeedbackDelay('4n.', 0.35);
+      delay = new Tone.FeedbackDelay('8n.', 0.35);  // Dotted 8th (~0.64s at 70bpm, within 1s limit)
       delay.wet.value = 0.2;
       delay.connect(masterFilter);
 
