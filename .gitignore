@@ -8,3 +8,8 @@ nul
 # WiFi profiles (contain passwords)
 Wi-Fi-*.xml
 lofi/nircmd*
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/

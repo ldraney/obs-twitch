@@ -4,7 +4,7 @@
   "description": "OBS remote control and monitoring for Twitch streaming",
   "main": "src/cli.js",
   "bin": {
-    "obs": "./src/cli.js"
+    "obs": "src/cli.js"
   },
   "scripts": {
     "obs": "node src/cli.js",
@@ -23,7 +23,13 @@
     "lofi:vol": "node lofi/cli.js volume",
     "test:follow": "node tests/follow.js",
     "test:raid": "node tests/raid.js",
-    "test:sub": "node tests/sub.js"
+    "test:sub": "node tests/sub.js",
+    "test:lofi": "npx playwright test --config=lofi/tests/playwright.config.js",
+    "test:lofi:smoke": "npx playwright test --config=lofi/tests/playwright.config.js smoke.spec.js",
+    "test:lofi:visual": "npx playwright test --config=lofi/tests/playwright.config.js visual.spec.js",
+    "test:lofi:update": "npx playwright test --config=lofi/tests/playwright.config.js --update-snapshots",
+    "test:lofi:ui": "npx playwright test --config=lofi/tests/playwright.config.js --ui",
+    "test:lofi:headed": "npx playwright test --config=lofi/tests/playwright.config.js --headed"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
@@ -35,5 +41,24 @@
     "obs-websocket-js": "^5.0.6",
     "react": "^17.0.2",
     "ws": "^8.18.3"
-  }
+  },
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ldraney/obs-twitch.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ldraney/obs-twitch/issues"
+  },
+  "homepage": "https://github.com/ldraney/obs-twitch#readme"
 }
