@@ -309,6 +309,11 @@ function connectBot() {
 
 function parseIRCMessage(raw) {
   try {
+    // Debug: log raw IRC (truncated)
+    if (raw.includes('PRIVMSG')) {
+      console.log('📥 RAW IRC:', raw.substring(0, 200) + (raw.length > 200 ? '...' : ''));
+    }
+
     // Parse IRC tags (badges, color, display-name, etc.)
     const tagMatch = raw.match(/^@([^ ]+)/);
     const tags = {};
@@ -317,6 +322,10 @@ function parseIRCMessage(raw) {
         const [key, value] = tag.split('=');
         tags[key] = value;
       });
+      // Debug: log if message has emotes tag
+      if (tags['emotes']) {
+        console.log('🎭 MESSAGE HAS EMOTES TAG');
+      }
     }
 
     // Parse the PRIVMSG content
@@ -339,12 +348,32 @@ function parseIRCMessage(raw) {
       });
     }
 
+    // Parse emotes (format: "emote_id:start-end,start-end/emote_id:start-end")
+    const emotes = [];
+    if (tags['emotes']) {
+      console.log('🎭 Raw emotes tag:', tags['emotes']);
+      const emoteGroups = tags['emotes'].split('/');
+      emoteGroups.forEach(group => {
+        const [id, positions] = group.split(':');
+        if (id && positions) {
+          positions.split(',').forEach(pos => {
+            const [start, end] = pos.split('-').map(Number);
+            emotes.push({ id, start, end });
+          });
+        }
+      });
+      // Sort by start position descending (so we can replace from end to start)
+      emotes.sort((a, b) => b.start - a.start);
+      console.log('🎭 Parsed emotes:', JSON.stringify(emotes));
+    }
+
     return {
       type: 'chat',
       username,
       message,
       color,
       badges,
+      emotes,
       timestamp: new Date().toISOString(),
     };
   } catch (e) {

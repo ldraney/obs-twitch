@@ -27,9 +27,11 @@ export function addMessage(data) {
     return;
   }
 
-  const { username, message, color, badges = [] } = data;
+  const { username, message, color, badges = [], emotes = [] } = data;
 
   console.log(`💬 Rendering: ${username}: ${message}`);
+  console.log(`🎭 Emotes received:`, emotes);
+  console.log(`🎭 Full data:`, JSON.stringify(data));
 
   // Create message element
   const msgEl = document.createElement('div');
@@ -38,7 +40,7 @@ export function addMessage(data) {
     <span class="chat-badges">${formatBadges(badges)}</span>
     <span class="chat-username" style="color: ${color || getRandomColor()}">${escapeHtml(username)}</span>
     <span class="chat-separator">:</span>
-    <span class="chat-text">${escapeHtml(message)}</span>
+    <span class="chat-text">${formatMessageWithEmotes(message, emotes)}</span>
   `;
 
   // Add to container
@@ -73,6 +75,37 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+/**
+ * Format message text with Twitch emotes rendered as images
+ */
+function formatMessageWithEmotes(message, emotes) {
+  if (!emotes || emotes.length === 0) {
+    return escapeHtml(message);
+  }
+
+  // Sort emotes by start position ascending for building the string
+  const sortedEmotes = [...emotes].sort((a, b) => a.start - b.start);
+
+  let result = '';
+  let lastEnd = 0;
+
+  for (const emote of sortedEmotes) {
+    const { id, start, end } = emote;
+    // Escape text before this emote
+    result += escapeHtml(message.substring(lastEnd, start));
+    // Add emote image
+    const emoteName = message.substring(start, end + 1);
+    const emoteUrl = `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/1.0`;
+    result += `<img class="chat-emote" src="${emoteUrl}" alt="${escapeHtml(emoteName)}" title="${escapeHtml(emoteName)}">`;
+    lastEnd = end + 1;
+  }
+
+  // Escape remaining text after last emote
+  result += escapeHtml(message.substring(lastEnd));
+
+  return result;
 }
 
 function getRandomColor() {

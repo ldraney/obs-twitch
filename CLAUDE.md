@@ -321,6 +321,50 @@ npm run obs chat "Hi" -b moderator  # Add badge
 - `overlay/server.js` - Twitch IRC + bot connections
 - `~/butlerbotphilo/CLAUDE.md` - Butler personality guide
 
+## Overlay Testing (Playwright)
+
+Automated tests for the stream overlay (chat, celebrations, effects).
+
+### Running Tests
+```bash
+npm run test:overlay          # Run all overlay tests
+npm run test:overlay:headed   # See the browser while testing
+npm run test:overlay:ui       # Playwright UI mode (interactive)
+npm run test:all              # Run both lofi and overlay tests
+```
+
+### What's Tested
+- Page loads without JS errors
+- ES modules load correctly
+- Chat module initializes
+- Canvas and chat container exist
+- Keyboard shortcuts trigger events (C=chat, F=follow, R=raid, S=sub)
+- Chat messages render with username and text
+- Multiple messages stack properly
+- Chat container auto-scrolls
+- Visual styling (positioning, purple border)
+
+### Test Files
+- `overlay/tests/playwright.config.cjs` - Playwright configuration
+- `overlay/tests/smoke.spec.cjs` - Smoke tests (15 tests)
+
+### Manual Testing
+```bash
+# Terminal 1: Start the server
+npm run alerts
+
+# Terminal 2: Trigger test events
+node overlay/test/trigger.js chat "TestUser" "Hello!"
+node overlay/test/trigger.js follow "NewFollower"
+node overlay/test/trigger.js raid "RaidLeader" 50
+node overlay/test/trigger.js sub "NewSub" 3
+```
+
+### Troubleshooting Tests
+- Tests run without WebSocket server (uses keyboard shortcuts)
+- If Twitch token expires: `cd ~/twitch-client && node auth.js refresh`
+- Update `~/twitch-secrets/.env` with new token
+
 ## Troubleshooting WiFi/Network Issues
 
 High dropped frames (>5%) with low bitrate often indicates WiFi problems.

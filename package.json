@@ -29,7 +29,11 @@
     "test:lofi:visual": "npx playwright test --config=lofi/tests/playwright.config.js visual.spec.js",
     "test:lofi:update": "npx playwright test --config=lofi/tests/playwright.config.js --update-snapshots",
     "test:lofi:ui": "npx playwright test --config=lofi/tests/playwright.config.js --ui",
-    "test:lofi:headed": "npx playwright test --config=lofi/tests/playwright.config.js --headed"
+    "test:lofi:headed": "npx playwright test --config=lofi/tests/playwright.config.js --headed",
+    "test:overlay": "npx playwright test --config=overlay/tests/playwright.config.cjs",
+    "test:overlay:headed": "npx playwright test --config=overlay/tests/playwright.config.cjs --headed",
+    "test:overlay:ui": "npx playwright test --config=overlay/tests/playwright.config.cjs --ui",
+    "test:all": "npm run test:lofi && npm run test:overlay"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",

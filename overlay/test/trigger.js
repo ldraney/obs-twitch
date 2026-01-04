@@ -46,6 +46,21 @@ const EVENTS = {
     message: message || 'Hello from the test trigger! 🤖',
     color: CHAT_COLORS[Math.floor(Math.random() * CHAT_COLORS.length)],
     badges: [],
+    emotes: [],
+  }),
+
+  // Test emotes - uses real Twitch emote IDs
+  emote: (username) => ({
+    type: 'chat',
+    username: username || 'EmoteTester',
+    message: 'Kappa hello LUL nice Kappa',
+    color: CHAT_COLORS[Math.floor(Math.random() * CHAT_COLORS.length)],
+    badges: ['subscriber'],
+    emotes: [
+      { id: '25', start: 0, end: 4 },      // Kappa
+      { id: '425618', start: 12, end: 14 }, // LUL
+      { id: '25', start: 21, end: 25 },     // Kappa
+    ],
   }),
 };
 
@@ -98,6 +113,7 @@ async function main() {
     console.log('  subscribe "Username" 3      Trigger sub alert with month count');
     console.log('  bits "Username" 500         Trigger bits alert with amount');
     console.log('  chat "Username" "Message"   Send a chat message to overlay');
+    console.log('  emote "Username"            Test emote rendering (Kappa, LUL)');
     console.log('');
     console.log('Options:');
     console.log('  --loop <event>              Send event every 5 seconds');
