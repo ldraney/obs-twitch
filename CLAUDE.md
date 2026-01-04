@@ -426,14 +426,24 @@ Decoupled system where any sound can drive any visual theme. See `lofi/ARCHITECT
 ```
 lofi/
   lib/              # Shared utilities
+    signals.js      # AudioSignals interface
+    conductor.js    # Sound↔Visual bridge
   visuals/          # Standalone visual themes
-    cosmic/         # Stars, nebulas, aurora
-  sounds/           # Standalone audio engines (WIP)
+    cosmic/         # Stars, nebulas, aurora, presets
+  sounds/           # Modular audio engines
+    base.js         # SoundEngine base class
+    sunrise-hustle.js  # First modular song
   experiences/      # Combined audio + visuals
     space-drift.html
     supernova.html
+    midnight-rain.html
+    sunrise-hustle.html
     index.html      # Gallery
 ```
+
+**Live Site:** https://ldraney.github.io/obs-twitch/lofi/experiences/
+
+**Latest Release:** [v1.0.0](https://github.com/ldraney/obs-twitch/releases/tag/v1.0.0)
 
 **Experiences:**
 | Experience | BPM | Duration | Vibe |
@@ -441,6 +451,7 @@ lofi/
 | Space Drift | 68 | 4:14 | Calm, ambient, floating |
 | Supernova | 75 | 3:50 | Dynamic, dual climaxes |
 | Midnight Rain | 70 | 3:26 | Melancholy, introspective, sparse piano |
+| Sunrise Hustle | 88 | 3:16 | Upbeat, Neo-Soul chords, J Dilla swing |
 
 **Visual Themes:**
 - `cosmic` - Star field, nebulas, aurora, shooting stars, color shifting
@@ -473,6 +484,6 @@ Tests cover: page load, ES modules, canvas rendering, play/stop, timeline, slide
 - Baselines stored in `lofi/tests/snapshots/`
 
 **Open Issues:**
-- #21: Refine canvas smoothness/FPS
-- #24: Decouple audio and visual systems (in progress)
-- #26: CI integration for tests (in progress)
+- #31: Tone.js timing errors during section jumps
+- #32: F11 fullscreen triggers old visual glitch
+- #33: Create HTML dashboard for obs-twitch-docs
