@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Supernova - Cosmic Lofi Experience</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/tone@14"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #050510;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    #canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    .controls {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+      background: rgba(5, 5, 16, 0.85);
+      border: 1px solid rgba(255, 100, 50, 0.2);
+      border-radius: 12px;
+      padding: 20px;
+      min-width: 200px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .title {
+      color: #ff6432;
+      font-size: 18px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      margin-bottom: 15px;
+      text-shadow: 0 0 20px rgba(255, 100, 50, 0.4);
+    }
+
+    .subtitle {
+      color: #555;
+      font-size: 11px;
+      margin-bottom: 15px;
+      font-style: italic;
+    }
+
+    .play-btn {
+      width: 100%;
+      padding: 14px 20px;
+      font-size: 14px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+      background: linear-gradient(135deg, #ff6432 0%, #cc4020 100%);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(255, 100, 50, 0.3);
+    }
+
+    .play-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(255, 100, 50, 0.5);
+    }
+
+    .play-btn.playing {
+      background: linear-gradient(135deg, #64ff88 0%, #40cc60 100%);
+      box-shadow: 0 4px 20px rgba(100, 255, 136, 0.4);
+    }
+
+    .control-row { margin-top: 15px; }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      color: #555;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .control-value {
+      color: #ff6432;
+      font-weight: bold;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255, 100, 50, 0.1);
+      border-radius: 3px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #ff6432;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(255, 100, 50, 0.5);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: #ff6432;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+    }
+
+    .section-indicator {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .current-section {
+      font-size: 20px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      text-align: center;
+      color: #ff6432;
+      text-shadow: 0 0 30px currentColor;
+      transition: color 0.3s, text-shadow 0.3s;
+    }
+
+    .section-time {
+      text-align: center;
+      color: #555;
+      font-size: 11px;
+      margin-top: 8px;
+    }
+
+    .timeline {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 50px;
+      z-index: 100;
+      background: linear-gradient(to top, rgba(5, 5, 16, 0.9), transparent);
+      display: flex;
+      align-items: flex-end;
+      padding: 10px 20px;
+    }
+
+    .timeline-track {
+      flex: 1;
+      height: 30px;
+      display: flex;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .timeline-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: filter 0.2s, transform 0.1s;
+      color: rgba(255, 255, 255, 0.8);
+      border-right: 1px solid rgba(0, 0, 0, 0.3);
+    }
+
+    .timeline-section:last-child { border-right: none; }
+    .timeline-section:hover { filter: brightness(1.3); }
+    .timeline-section.active { filter: brightness(1.5); transform: scaleY(1.05); }
+
+    /* Dynamic section colors - calm to climax */
+    .timeline-section.stillness { background: linear-gradient(180deg, #1a1a2a, #0d0d15); }
+    .timeline-section.awakening { background: linear-gradient(180deg, #2a1a3a, #1a1025); }
+    .timeline-section.rising { background: linear-gradient(180deg, #4a2a4a, #301830); }
+    .timeline-section.supernova { background: linear-gradient(180deg, #ff6432, #cc3010); }
+    .timeline-section.aftermath { background: linear-gradient(180deg, #3a2a4a, #251835); }
+    .timeline-section.rebirth { background: linear-gradient(180deg, #4a3a5a, #302540); }
+    .timeline-section.ascending { background: linear-gradient(180deg, #6a4a6a, #453050); }
+    .timeline-section.transcend { background: linear-gradient(180deg, #ffaa44, #dd7720); }
+    .timeline-section.fade { background: linear-gradient(180deg, #2a2a3a, #1a1a25); }
+
+    .playhead {
+      position: absolute;
+      width: 3px;
+      height: 100%;
+      background: #fff;
+      box-shadow: 0 0 12px #fff;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 10;
+      border-radius: 2px;
+    }
+
+    @media (max-width: 600px) {
+      .controls { top: 10px; left: 10px; right: 10px; min-width: auto; padding: 15px; }
+      .title { font-size: 14px; }
+      .play-btn { padding: 12px 16px; font-size: 12px; }
+      .timeline-section { font-size: 6px; }
+    }
+
+    .hint {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #333;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      z-index: 50;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div class="controls">
+    <div class="title">Supernova</div>
+    <div class="subtitle">// calm → climax → transcendence</div>
+
+    <button id="playBtn" class="play-btn">Ignite</button>
+
+    <div class="control-row">
+      <div class="control-label">
+        <span>Volume</span>
+        <span class="control-value" id="volVal">-6 dB</span>
+      </div>
+      <input type="range" id="volumeSlider" min="-30" max="0" value="-6">
+    </div>
+
+    <div class="control-row">
+      <div class="control-label">
+        <span>BPM</span>
+        <span class="control-value" id="bpmVal">75</span>
+      </div>
+      <input type="range" id="bpmSlider" min="65" max="90" value="75">
+    </div>
+
+    <div class="section-indicator">
+      <div class="current-section" id="currentSection">Ready</div>
+      <div class="section-time" id="sectionTime">0:00 / 3:50</div>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-track" id="timeline">
+      <div class="playhead" id="playhead"></div>
+    </div>
+  </div>
+
+  <div class="hint">Click timeline to jump • Loop enabled</div>
+
+  <script>
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function map(v, a, b, c, d) { return ((v - a) / (b - a)) * (d - c) + c; }
+    function clamp(v, min, max) { return Math.min(Math.max(v, min), max); }
+    function createSmoother(f = 0.1) {
+      let v = null;
+      return t => { v = v === null ? t : lerp(v, t, f); return v; };
+    }
+
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let isInitialized = false;
+    let isPlaying = false;
+    let currentSectionIndex = 0;
+
+    // Audio nodes
+    let masterFilter, reverb, delay, compressor, limiter;
+    let kick, snare, hihat, clap, ride;
+    let pad, pad2, bass, lead, arpeggio, sub;
+    let noise, noiseFilter;
+    let drumLoop, padLoop, bassLoop, leadLoop, arpLoop, subLoop;
+
+    // Audio analyzers
+    let fft, meter;
+
+    // Song structure: calm → build → CLIMAX → calm → build → BIGGER CLIMAX
+    // 72 bars @ 75 BPM = ~3:50
+    const songStructure = [
+      { name: 'stillness', startBar: 0, bars: 8, label: 'Stillness', color: '#3a3a5a', intensity: 0.1 },
+      { name: 'awakening', startBar: 8, bars: 8, label: 'Awakening', color: '#5a4a7a', intensity: 0.3 },
+      { name: 'rising', startBar: 16, bars: 8, label: 'Rising', color: '#7a5a9a', intensity: 0.5 },
+      { name: 'supernova', startBar: 24, bars: 8, label: 'Supernova', color: '#ff6432', intensity: 1.0 },
+      { name: 'aftermath', startBar: 32, bars: 8, label: 'Aftermath', color: '#5a4a6a', intensity: 0.2 },
+      { name: 'rebirth', startBar: 40, bars: 8, label: 'Rebirth', color: '#6a5a8a', intensity: 0.4 },
+      { name: 'ascending', startBar: 48, bars: 8, label: 'Ascending', color: '#8a6aaa', intensity: 0.7 },
+      { name: 'transcend', startBar: 56, bars: 8, label: 'Transcend', color: '#ffaa44', intensity: 1.0 },
+      { name: 'fade', startBar: 64, bars: 8, label: 'Fade', color: '#4a4a6a', intensity: 0.15 }
+    ];
+    const totalBars = 72;
+
+    // Section configurations - dramatic dynamics!
+    const sectionConfigs = {
+      stillness: {
+        kick: false, snare: false, hihat: false, clap: false, ride: false,
+        pad: true, bass: false, lead: false, arp: false, sub: true,
+        filterFreq: 200, reverbWet: 0.9, masterVol: -12, padVol: -16, subVol: -20
+      },
+      awakening: {
+        kick: true, snare: false, hihat: false, clap: false, ride: false,
+        pad: true, bass: true, lead: false, arp: false, sub: true,
+        filterFreq: 500, reverbWet: 0.7, masterVol: -8, padVol: -12, subVol: -16
+      },
+      rising: {
+        kick: true, snare: true, hihat: true, clap: false, ride: false,
+        pad: true, bass: true, lead: false, arp: true, sub: true,
+        filterFreq: 1200, reverbWet: 0.5, masterVol: -6, padVol: -10, subVol: -12
+      },
+      supernova: {
+        kick: true, snare: true, hihat: true, clap: true, ride: true,
+        pad: true, bass: true, lead: true, arp: true, sub: true,
+        filterFreq: 3500, reverbWet: 0.3, masterVol: -2, padVol: -6, subVol: -8
+      },
+      aftermath: {
+        kick: false, snare: false, hihat: false, clap: false, ride: false,
+        pad: true, bass: false, lead: false, arp: false, sub: true,
+        filterFreq: 300, reverbWet: 0.85, masterVol: -10, padVol: -14, subVol: -18
+      },
+      rebirth: {
+        kick: true, snare: false, hihat: false, clap: false, ride: false,
+        pad: true, bass: true, lead: false, arp: false, sub: true,
+        filterFreq: 600, reverbWet: 0.65, masterVol: -7, padVol: -11, subVol: -14
+      },
+      ascending: {
+        kick: true, snare: true, hihat: true, clap: false, ride: true,
+        pad: true, bass: true, lead: true, arp: true, sub: true,
+        filterFreq: 1800, reverbWet: 0.4, masterVol: -4, padVol: -8, subVol: -10
+      },
+      transcend: {
+        kick: true, snare: true, hihat: true, clap: true, ride: true,
+        pad: true, bass: true, lead: true, arp: true, sub: true,
+        filterFreq: 4500, reverbWet: 0.25, masterVol: 0, padVol: -4, subVol: -6
+      },
+      fade: {
+        kick: false, snare: false, hihat: false, clap: false, ride: false,
+        pad: true, bass: false, lead: false, arp: false, sub: true,
+        filterFreq: 250, reverbWet: 0.9, masterVol: -14, padVol: -18, subVol: -22
+      }
+    };
+
+    // Current intensity for visuals
+    let currentIntensity = 0.1;
+    let targetIntensity = 0.1;
+
+    // ============================================================================
+    // STAR FIELD (same as Space Drift)
+    // ============================================================================
+
+    const STAR_LAYERS = 3;
+    const STARS_PER_LAYER = [200, 150, 100];
+    const STAR_SPEEDS = [0.1, 0.3, 0.6];
+    const STAR_SIZES = [1, 1.5, 2.5];
+    let starLayers = [];
+    let shootingStars = [];
+    const MAX_SHOOTING_STARS = 8;
+    let nebulaParticles = [];
+    const NEBULA_PARTICLE_COUNT = 35;
+    let auroraPhase = 0;
+
+    const smoothers = {
+      rms: createSmoother(0.12),
+      bass: createSmoother(0.15),
+      mid: createSmoother(0.1),
+      high: createSmoother(0.2),
+      bands: Array.from({ length: 8 }, () => createSmoother(0.15)),
+    };
+
+    let cosmicHue = 260;
+    let pulseIntensity = 0;
+    let prevRms = 0;
+
+    // ============================================================================
+    // CANVAS SETUP
+    // ============================================================================
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      initStarField();
+      initNebulaParticles();
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    function initStarField() {
+      starLayers = [];
+      for (let layer = 0; layer < STAR_LAYERS; layer++) {
+        const stars = [];
+        for (let i = 0; i < STARS_PER_LAYER[layer]; i++) {
+          stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            twinklePhase: Math.random() * Math.PI * 2,
+            twinkleSpeed: 0.02 + Math.random() * 0.03,
+            baseAlpha: 0.3 + Math.random() * 0.7
+          });
+        }
+        starLayers.push(stars);
+      }
+    }
+
+    function initNebulaParticles() {
+      nebulaParticles = [];
+      for (let i = 0; i < NEBULA_PARTICLE_COUNT; i++) {
+        nebulaParticles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: 50 + Math.random() * 150,
+          hue: 240 + Math.random() * 80,
+          alpha: 0.02 + Math.random() * 0.03,
+          driftX: (Math.random() - 0.5) * 0.3,
+          driftY: (Math.random() - 0.5) * 0.15
+        });
+      }
+    }
+
+    // ============================================================================
+    // AUDIO INITIALIZATION
+    // ============================================================================
+
+    async function initAudio() {
+      if (isInitialized) return;
+
+      await Tone.start();
+
+      Tone.Transport.bpm.value = 75;
+      Tone.Transport.swing = 0.1;
+      Tone.Transport.swingSubdivision = '16n';
+
+      // Limiter for climax sections
+      limiter = new Tone.Limiter(-1).toDestination();
+
+      // Compressor
+      compressor = new Tone.Compressor({
+        threshold: -18,
+        ratio: 4,
+        attack: 0.005,
+        release: 0.2
+      }).connect(limiter);
+
+      // Master filter - wide range for dynamics
+      masterFilter = new Tone.Filter({
+        frequency: 1000,
+        type: 'lowpass',
+        rolloff: -24,
+        Q: 1
+      }).connect(compressor);
+
+      // Reverb
+      reverb = new Tone.Reverb({ decay: 6, wet: 0.5 });
+      await reverb.generate();
+      reverb.connect(masterFilter);
+
+      // Delay
+      delay = new Tone.FeedbackDelay('8n.', 0.3);
+      delay.wet.value = 0.2;
+      delay.connect(masterFilter);
+
+      // Analyzers
+      fft = new Tone.FFT(256);
+      meter = new Tone.Meter();
+      Tone.Destination.connect(fft);
+      Tone.Destination.connect(meter);
+
+      // Noise texture
+      noiseFilter = new Tone.Filter(600, 'bandpass').connect(compressor);
+      noise = new Tone.Noise('pink');
+      noise.connect(noiseFilter);
+      noise.volume.value = -30;
+
+      // === DRUMS ===
+
+      // Punchy kick
+      kick = new Tone.MembraneSynth({
+        pitchDecay: 0.05,
+        octaves: 6,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.3 }
+      }).connect(masterFilter);
+      kick.volume.value = -Infinity;
+
+      // Snappy snare
+      snare = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.1 }
+      }).connect(reverb);
+      snare.volume.value = -Infinity;
+
+      // Crisp hihat
+      hihat = new Tone.MetalSynth({
+        frequency: 250,
+        envelope: { attack: 0.001, decay: 0.06, release: 0.01 },
+        harmonicity: 5,
+        modulationIndex: 28,
+        resonance: 4500,
+        octaves: 1.3
+      }).connect(masterFilter);
+      hihat.volume.value = -Infinity;
+
+      // Clap for climax
+      clap = new Tone.NoiseSynth({
+        noise: { type: 'pink' },
+        envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.15 }
+      }).connect(reverb);
+      clap.volume.value = -Infinity;
+
+      // Ride for texture
+      ride = new Tone.MetalSynth({
+        frequency: 350,
+        envelope: { attack: 0.001, decay: 0.4, release: 0.1 },
+        harmonicity: 8,
+        modulationIndex: 15,
+        resonance: 6000,
+        octaves: 1
+      }).connect(reverb);
+      ride.volume.value = -Infinity;
+
+      // === SYNTHS ===
+
+      // Main pad - rich and warm
+      pad = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 1.2, decay: 1.5, sustain: 0.6, release: 2.5 }
+      });
+      const padFilter = new Tone.Filter(800, 'lowpass').connect(reverb);
+      pad.connect(padFilter);
+      pad.volume.value = -12;
+
+      // Sub bass - deep
+      sub = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.2, decay: 0.5, sustain: 0.8, release: 1 }
+      }).connect(masterFilter);
+      sub.volume.value = -Infinity;
+
+      // Bass - punchy
+      bass = new Tone.Synth({
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.02, decay: 0.2, sustain: 0.5, release: 0.3 }
+      }).connect(masterFilter);
+      bass.volume.value = -Infinity;
+
+      // Lead - for climax
+      lead = new Tone.Synth({
+        oscillator: { type: 'square' },
+        envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 0.6 }
+      });
+      const leadFilter = new Tone.Filter(2000, 'lowpass').connect(delay);
+      lead.connect(leadFilter);
+      lead.volume.value = -Infinity;
+
+      // Arpeggio
+      arpeggio = new Tone.Synth({
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.5 }
+      }).connect(delay).connect(reverb);
+      arpeggio.volume.value = -Infinity;
+
+      createPatterns();
+      scheduleStructure();
+      buildTimeline();
+
+      isInitialized = true;
+    }
+
+    // ============================================================================
+    // PATTERNS
+    // ============================================================================
+
+    function createPatterns() {
+      // Dynamic drum loop - changes based on section
+      drumLoop = new Tone.Loop((time) => {
+        const bar = parseInt(Tone.Transport.position.split(':')[0]);
+        const beat = parseInt(Tone.Transport.position.split(':')[1]);
+        const sixteenth = Math.floor(parseFloat(Tone.Transport.position.split(':')[2]) / 0.25);
+
+        const h = () => (Math.random() - 0.5) * 0.015;
+        const v = () => 0.75 + Math.random() * 0.25;
+
+        // Kick pattern - gets busier in climax
+        if (beat === 0 && sixteenth === 0) {
+          kick.triggerAttackRelease('C1', '8n', time + h(), v());
+        }
+        if (currentIntensity > 0.4 && beat === 1 && sixteenth === 2) {
+          kick.triggerAttackRelease('C1', '16n', time + h(), v() * 0.7);
+        }
+        if (beat === 2 && sixteenth === 0) {
+          kick.triggerAttackRelease('C1', '8n', time + h(), v() * 0.9);
+        }
+        if (currentIntensity > 0.7 && beat === 3 && sixteenth === 2) {
+          kick.triggerAttackRelease('C1', '16n', time + h(), v() * 0.6);
+        }
+
+        // Snare on 2 and 4
+        if ((beat === 1 || beat === 3) && sixteenth === 0) {
+          snare.triggerAttackRelease('16n', time + h(), v() * 0.8);
+        }
+
+        // Hihat - density based on intensity
+        const hihatProb = currentIntensity > 0.7 ? 0.9 : currentIntensity > 0.4 ? 0.6 : 0.3;
+        if (sixteenth % 2 === 0 && Math.random() < hihatProb) {
+          const vel = sixteenth === 0 ? 0.5 : 0.3;
+          hihat.triggerAttackRelease('32n', time + h(), vel * v());
+
+          if (Math.random() > 0.8) spawnShootingStar();
+        }
+
+        // Clap layered with snare in climax
+        if (currentIntensity > 0.8 && (beat === 1 || beat === 3) && sixteenth === 0) {
+          clap.triggerAttackRelease('16n', time + h() + 0.01, v() * 0.5);
+        }
+
+        // Ride on off-beats in climax
+        if (currentIntensity > 0.6 && beat % 2 === 1 && sixteenth === 2) {
+          ride.triggerAttackRelease('8n', time + h(), v() * 0.4);
+        }
+      }, '16n');
+
+      // Epic chord progression - emotional journey
+      const chordProgressions = {
+        calm: [
+          ['D3', 'A3', 'F4'],       // Dm
+          ['C3', 'G3', 'E4'],       // C
+          ['Bb2', 'F3', 'D4'],      // Bb
+          ['A2', 'E3', 'C4']        // Am
+        ],
+        build: [
+          ['D3', 'A3', 'F4', 'C5'], // Dm9
+          ['G2', 'D3', 'B3', 'F4'], // G7
+          ['C3', 'G3', 'E4', 'B4'], // Cmaj7
+          ['A2', 'E3', 'C4', 'G4']  // Am7
+        ],
+        climax: [
+          ['D3', 'F3', 'A3', 'C4', 'E4'], // Dm9 full
+          ['Bb2', 'D3', 'F3', 'A3', 'C4'], // Bbmaj7
+          ['G2', 'B2', 'D3', 'F3', 'A3'],  // G9
+          ['A2', 'C3', 'E3', 'G3', 'B3']   // Am9
+        ]
+      };
+
+      let chordIndex = 0;
+      padLoop = new Tone.Loop((time) => {
+        let chords;
+        if (currentIntensity > 0.7) chords = chordProgressions.climax;
+        else if (currentIntensity > 0.3) chords = chordProgressions.build;
+        else chords = chordProgressions.calm;
+
+        const chord = chords[chordIndex % 4];
+        const vel = 0.4 + currentIntensity * 0.4;
+        pad.triggerAttackRelease(chord, '1m', time + (Math.random() - 0.5) * 0.05, vel);
+        chordIndex++;
+      }, '1m');
+
+      // Bass follows chords
+      const bassNotes = ['D2', 'C2', 'Bb1', 'A1'];
+      let bassIndex = 0;
+      bassLoop = new Tone.Loop((time) => {
+        const note = bassNotes[bassIndex % 4];
+        const vel = 0.5 + currentIntensity * 0.4;
+        bass.triggerAttackRelease(note, '2n', time + (Math.random() - 0.5) * 0.02, vel);
+
+        // Octave jump in climax
+        if (currentIntensity > 0.7 && Math.random() > 0.5) {
+          const high = note.replace('1', '2').replace('2', '3');
+          bass.triggerAttackRelease(high, '8n', time + Tone.Time('4n').toSeconds(), vel * 0.7);
+        }
+        bassIndex++;
+      }, '1m');
+
+      // Sub bass - deep foundation
+      const subNotes = ['D1', 'C1', 'Bb0', 'A0'];
+      let subIndex = 0;
+      subLoop = new Tone.Loop((time) => {
+        const note = subNotes[subIndex % 4];
+        sub.triggerAttackRelease(note, '1m', time, 0.6 + currentIntensity * 0.3);
+        subIndex++;
+      }, '1m');
+
+      // Lead melody - only in climax sections
+      const leadMelodies = [
+        ['A4', 'G4', 'F4', 'E4'],
+        ['D5', 'C5', 'A4', 'G4'],
+        ['F4', 'G4', 'A4', 'C5'],
+        ['E4', 'D4', 'C4', 'A3']
+      ];
+      let leadBar = 0;
+      leadLoop = new Tone.Loop((time) => {
+        if (currentIntensity > 0.6) {
+          const melody = leadMelodies[leadBar % 4];
+          const noteIndex = Math.floor(Math.random() * melody.length);
+          const note = melody[noteIndex];
+          lead.triggerAttackRelease(note, '4n', time + (Math.random() - 0.5) * 0.03, 0.5 + Math.random() * 0.3);
+        }
+        leadBar++;
+      }, '2n');
+
+      // Arpeggio - sparkle
+      const arpNotes = ['D5', 'F5', 'A5', 'C6', 'D6', 'F6'];
+      arpLoop = new Tone.Loop((time) => {
+        if (currentIntensity > 0.3 && Math.random() > 0.4) {
+          const note = arpNotes[Math.floor(Math.random() * arpNotes.length)];
+          const vel = 0.2 + currentIntensity * 0.4;
+          arpeggio.triggerAttackRelease(note, '16n', time + (Math.random() - 0.5) * 0.03, vel);
+        }
+      }, '8n');
+    }
+
+    function spawnShootingStar() {
+      if (shootingStars.length >= MAX_SHOOTING_STARS) return;
+      shootingStars.push({
+        x: Math.random() * canvas.width * 0.5,
+        y: Math.random() * canvas.height * 0.4,
+        vx: 10 + Math.random() * 10 + currentIntensity * 10,
+        vy: 5 + Math.random() * 5,
+        life: 1,
+        length: 40 + Math.random() * 60 + currentIntensity * 30
+      });
+    }
+
+    // ============================================================================
+    // SONG STRUCTURE
+    // ============================================================================
+
+    function scheduleStructure() {
+      Tone.Transport.cancel();
+
+      songStructure.forEach((section, index) => {
+        Tone.Transport.schedule((time) => {
+          currentSectionIndex = index;
+          targetIntensity = section.intensity;
+          applySection(section.name, time);
+          Tone.Draw.schedule(() => updateSectionDisplay(section, index), time);
+        }, `${section.startBar}:0:0`);
+      });
+
+      // Smooth filter automation for builds
+      // Build to first climax
+      Tone.Transport.schedule((time) => {
+        masterFilter.frequency.exponentialRampTo(1200, 8, time);
+      }, '12:0:0');
+      Tone.Transport.schedule((time) => {
+        masterFilter.frequency.exponentialRampTo(3500, 4, time);
+      }, '20:0:0');
+
+      // Drop after climax
+      Tone.Transport.schedule((time) => {
+        masterFilter.frequency.exponentialRampTo(300, 2, time);
+      }, '32:0:0');
+
+      // Build to transcendence
+      Tone.Transport.schedule((time) => {
+        masterFilter.frequency.exponentialRampTo(1000, 8, time);
+      }, '36:0:0');
+      Tone.Transport.schedule((time) => {
+        masterFilter.frequency.exponentialRampTo(2500, 6, time);
+      }, '46:0:0');
+      Tone.Transport.schedule((time) => {
+        masterFilter.frequency.exponentialRampTo(4500, 4, time);
+      }, '52:0:0');
+
+      // Fade out
+      Tone.Transport.schedule((time) => {
+        masterFilter.frequency.exponentialRampTo(250, 6, time);
+        pad.volume.rampTo(-25, 8, time);
+      }, '64:0:0');
+
+      // Enable native looping
+      Tone.Transport.loop = true;
+      Tone.Transport.loopStart = 0;
+      Tone.Transport.loopEnd = `${totalBars}:0:0`;
+    }
+
+    function applySection(name, time) {
+      const config = sectionConfigs[name];
+      const rampTime = 0.5;
+
+      masterFilter.frequency.rampTo(config.filterFreq, rampTime, time);
+      reverb.wet.rampTo(config.reverbWet, rampTime, time);
+
+      kick.volume.rampTo(config.kick ? -6 : -Infinity, 0.3, time);
+      snare.volume.rampTo(config.snare ? -8 : -Infinity, 0.3, time);
+      hihat.volume.rampTo(config.hihat ? -18 : -Infinity, 0.3, time);
+      clap.volume.rampTo(config.clap ? -12 : -Infinity, 0.3, time);
+      ride.volume.rampTo(config.ride ? -20 : -Infinity, 0.3, time);
+
+      pad.volume.rampTo(config.pad ? config.padVol : -Infinity, 0.3, time);
+      sub.volume.rampTo(config.sub ? config.subVol : -Infinity, 0.3, time);
+      bass.volume.rampTo(config.bass ? -6 : -Infinity, 0.3, time);
+      lead.volume.rampTo(config.lead ? -10 : -Infinity, 0.3, time);
+      arpeggio.volume.rampTo(config.arp ? -14 : -Infinity, 0.3, time);
+    }
+
+    function updateSectionDisplay(section, index) {
+      const el = document.getElementById('currentSection');
+      el.textContent = section.label;
+      el.style.color = section.color;
+      el.style.textShadow = `0 0 ${30 + section.intensity * 30}px ${section.color}`;
+
+      document.querySelectorAll('.timeline-section').forEach((s, i) => {
+        s.classList.toggle('active', i === index);
+      });
+    }
+
+    // ============================================================================
+    // TIMELINE
+    // ============================================================================
+
+    function buildTimeline() {
+      const timeline = document.getElementById('timeline');
+      timeline.innerHTML = '<div class="playhead" id="playhead"></div>';
+
+      songStructure.forEach((section, index) => {
+        const div = document.createElement('div');
+        div.className = `timeline-section ${section.name}`;
+        div.style.width = `${(section.bars / totalBars) * 100}%`;
+        div.textContent = section.label;
+        div.addEventListener('click', () => jumpToSection(index));
+        timeline.appendChild(div);
+      });
+    }
+
+    function jumpToSection(index) {
+      if (!isInitialized) return;
+
+      const section = songStructure[index];
+      currentSectionIndex = index;
+      targetIntensity = section.intensity;
+      Tone.Transport.position = `${section.startBar}:0:0`;
+      applySection(section.name, Tone.now());
+      updateSectionDisplay(section, index);
+
+      if (!isPlaying) startPlayback();
+    }
+
+    // ============================================================================
+    // PLAYBACK
+    // ============================================================================
+
+    async function startPlayback() {
+      if (!isInitialized) await initAudio();
+      if (isPlaying) return;
+
+      drumLoop.start(0);
+      padLoop.start(0);
+      bassLoop.start(0);
+      subLoop.start(0);
+      leadLoop.start(0);
+      arpLoop.start(0);
+      noise.start();
+
+      Tone.Transport.start();
+      isPlaying = true;
+
+      document.getElementById('playBtn').textContent = 'Stop';
+      document.getElementById('playBtn').classList.add('playing');
+    }
+
+    function stopPlayback() {
+      drumLoop.stop();
+      padLoop.stop();
+      bassLoop.stop();
+      subLoop.stop();
+      leadLoop.stop();
+      arpLoop.stop();
+      noise.stop();
+
+      Tone.Transport.stop();
+      Tone.Transport.position = 0;
+      isPlaying = false;
+      currentSectionIndex = 0;
+      currentIntensity = 0.1;
+      targetIntensity = 0.1;
+
+      document.getElementById('playBtn').textContent = 'Ignite';
+      document.getElementById('playBtn').classList.remove('playing');
+      document.getElementById('currentSection').textContent = 'Ready';
+      document.getElementById('currentSection').style.color = '#ff6432';
+      document.getElementById('playhead').style.left = '0%';
+    }
+
+    // ============================================================================
+    // AUDIO ANALYSIS
+    // ============================================================================
+
+    function getAudioFeatures() {
+      if (!fft || !meter) {
+        return { bands: new Array(8).fill(0), rms: 0, bass: 0, mid: 0, high: 0 };
+      }
+
+      const fftValues = fft.getValue();
+      const rmsDb = meter.getValue();
+      const rms = clamp(map(rmsDb, -60, -3, 0, 1), 0, 1);
+
+      const numBins = fftValues.length;
+      const bandsPerGroup = Math.floor(numBins / 8);
+      const bands = [];
+
+      for (let i = 0; i < 8; i++) {
+        const start = i * bandsPerGroup;
+        const end = Math.min(start + bandsPerGroup, numBins);
+        let sum = 0;
+        for (let j = start; j < end; j++) {
+          const linear = clamp(map(fftValues[j], -100, -15, 0, 1), 0, 1);
+          sum += linear;
+        }
+        bands.push(sum / (end - start));
+      }
+
+      const bass = (bands[0] + bands[1]) / 2;
+      const mid = (bands[2] + bands[3] + bands[4]) / 3;
+      const high = (bands[5] + bands[6] + bands[7]) / 3;
+
+      return { bands, rms, bass, mid, high };
+    }
+
+    // ============================================================================
+    // DRAWING (enhanced for intensity)
+    // ============================================================================
+
+    function drawBackground(width, height, smoothedRms, smoothedBass) {
+      const gradient = ctx.createRadialGradient(
+        width / 2, height / 2, 0,
+        width / 2, height / 2, Math.max(width, height) * 0.8
+      );
+
+      // Hue shifts from purple (calm) to orange/red (climax)
+      const intensityHue = lerp(260, 20, currentIntensity);
+      const pulseAmount = smoothedBass * 0.2 * (1 + currentIntensity);
+      const baseLightness = 3 + pulseAmount * 8 + currentIntensity * 5;
+
+      gradient.addColorStop(0, `hsl(${intensityHue + 20}, ${40 + currentIntensity * 30}%, ${baseLightness + 5}%)`);
+      gradient.addColorStop(0.5, `hsl(${intensityHue}, ${30 + currentIntensity * 20}%, ${baseLightness}%)`);
+      gradient.addColorStop(1, `hsl(${intensityHue - 30}, 25%, ${baseLightness - 1}%)`);
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    function drawNebulaParticles(width, height, smoothedMid) {
+      nebulaParticles.forEach(particle => {
+        particle.x += particle.driftX * (1 + currentIntensity);
+        particle.y += particle.driftY * (1 + currentIntensity);
+
+        if (particle.x < -particle.radius) particle.x = width + particle.radius;
+        if (particle.x > width + particle.radius) particle.x = -particle.radius;
+        if (particle.y < -particle.radius) particle.y = height + particle.radius;
+        if (particle.y > height + particle.radius) particle.y = -particle.radius;
+
+        const intensityHue = lerp(particle.hue, particle.hue - 60 + currentIntensity * 120, currentIntensity);
+        const gradient = ctx.createRadialGradient(
+          particle.x, particle.y, 0,
+          particle.x, particle.y, particle.radius * (1 + currentIntensity * 0.3)
+        );
+
+        const alpha = particle.alpha * (1 + smoothedMid * 0.5 + currentIntensity * 0.5);
+        gradient.addColorStop(0, `hsla(${intensityHue}, ${60 + currentIntensity * 20}%, ${40 + currentIntensity * 15}%, ${alpha})`);
+        gradient.addColorStop(0.5, `hsla(${intensityHue + 20}, 50%, 30%, ${alpha * 0.5})`);
+        gradient.addColorStop(1, 'transparent');
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.radius * (1 + currentIntensity * 0.3), 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function drawAurora(width, height, smoothedBands) {
+      auroraPhase += 0.005 + currentIntensity * 0.01;
+
+      const auroraY = height * 0.3;
+      const amplitude = 50 + smoothedBands[2] * 100 + currentIntensity * 80;
+
+      ctx.globalAlpha = 0.15 + smoothedBands[3] * 0.2 + currentIntensity * 0.15;
+
+      for (let wave = 0; wave < 3; wave++) {
+        const waveHue = lerp(380, 30, currentIntensity) + wave * 30;
+        const waveOffset = wave * 0.5;
+
+        ctx.beginPath();
+        ctx.moveTo(0, auroraY);
+
+        for (let x = 0; x <= width; x += 5) {
+          const y = auroraY +
+            Math.sin((x * 0.005) + auroraPhase + waveOffset) * amplitude +
+            Math.sin((x * 0.01) + auroraPhase * 1.5) * amplitude * 0.5;
+          ctx.lineTo(x, y);
+        }
+
+        ctx.lineTo(width, 0);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+
+        const gradient = ctx.createLinearGradient(0, auroraY - amplitude, 0, 0);
+        gradient.addColorStop(0, `hsla(${waveHue}, ${70 + currentIntensity * 20}%, ${50 + currentIntensity * 20}%, ${0.3 + currentIntensity * 0.2})`);
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1;
+    }
+
+    function drawStarField(width, height, smoothedRms, dt) {
+      starLayers.forEach((stars, layerIndex) => {
+        const speed = STAR_SPEEDS[layerIndex] * (1 + currentIntensity * 2);
+        const size = STAR_SIZES[layerIndex] * (1 + currentIntensity * 0.5);
+
+        stars.forEach(star => {
+          star.x -= speed * dt * 60 * (0.5 + smoothedRms * 0.5);
+          if (star.x < 0) {
+            star.x = width;
+            star.y = Math.random() * height;
+          }
+
+          star.twinklePhase += star.twinkleSpeed * (1 + currentIntensity);
+          const twinkle = 0.5 + Math.sin(star.twinklePhase) * 0.5;
+          const alpha = star.baseAlpha * twinkle * (0.6 + smoothedRms * 0.4 + currentIntensity * 0.3);
+
+          const starSize = size * (0.8 + smoothedRms * 0.4);
+
+          // Star color shifts with intensity
+          const starHue = lerp(240, 30, currentIntensity);
+
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, starSize * 3, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${starHue}, 30%, 80%, ${alpha * 0.15})`;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, starSize, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+          ctx.fill();
+        });
+      });
+    }
+
+    function drawShootingStars(width, height, dt) {
+      shootingStars = shootingStars.filter(star => {
+        star.x += star.vx * dt * 60;
+        star.y += star.vy * dt * 60;
+        star.life -= dt * 1.5;
+
+        if (star.life <= 0 || star.x > width || star.y > height) return false;
+
+        const gradient = ctx.createLinearGradient(
+          star.x, star.y,
+          star.x - star.length, star.y - star.length * 0.5
+        );
+
+        const trailHue = lerp(200, 40, currentIntensity);
+        gradient.addColorStop(0, `hsla(${trailHue}, 80%, 70%, ${star.life})`);
+        gradient.addColorStop(1, 'transparent');
+
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 2 + currentIntensity * 2;
+        ctx.beginPath();
+        ctx.moveTo(star.x, star.y);
+        ctx.lineTo(star.x - star.length * star.life, star.y - star.length * 0.5 * star.life);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, 2 + currentIntensity * 2, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${star.life})`;
+        ctx.fill();
+
+        return true;
+      });
+    }
+
+    function drawCentralGlow(width, height, smoothedRms, smoothedBass) {
+      const centerX = width / 2;
+      const centerY = height * 0.4;
+      const baseRadius = 100 + smoothedBass * 150 + currentIntensity * 200;
+      const pulseRadius = baseRadius * (1 + pulseIntensity * 0.4);
+
+      const gradient = ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, pulseRadius
+      );
+
+      const glowHue = lerp(280, 30, currentIntensity);
+      const glowAlpha = 0.1 + smoothedRms * 0.15 + currentIntensity * 0.2;
+
+      gradient.addColorStop(0, `hsla(${glowHue}, ${50 + currentIntensity * 30}%, ${70 + currentIntensity * 20}%, ${glowAlpha})`);
+      gradient.addColorStop(0.3, `hsla(${glowHue + 20}, 40%, 50%, ${glowAlpha * 0.5})`);
+      gradient.addColorStop(1, 'transparent');
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, pulseRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ============================================================================
+    // RENDER LOOP
+    // ============================================================================
+
+    let lastTime = performance.now();
+
+    function render() {
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      const { width, height } = canvas;
+
+      // Smooth intensity transitions
+      currentIntensity = lerp(currentIntensity, targetIntensity, 0.03);
+
+      const audioFeatures = getAudioFeatures();
+
+      const smoothedRms = smoothers.rms(audioFeatures.rms);
+      const smoothedBass = smoothers.bass(audioFeatures.bass);
+      const smoothedMid = smoothers.mid(audioFeatures.mid);
+      const smoothedBands = audioFeatures.bands.map((b, i) => smoothers.bands[i](b));
+
+      const rmsDelta = smoothedRms - prevRms;
+      if (rmsDelta > 0.03) {
+        pulseIntensity = Math.max(pulseIntensity, rmsDelta * 8 * (1 + currentIntensity));
+      }
+      pulseIntensity *= 0.92;
+      prevRms = smoothedRms;
+
+      cosmicHue = lerp(260, 30, currentIntensity) + Math.sin(now * 0.0001) * 20;
+
+      // Draw layers
+      drawBackground(width, height, smoothedRms, smoothedBass);
+      drawNebulaParticles(width, height, smoothedMid);
+      drawAurora(width, height, smoothedBands);
+      drawCentralGlow(width, height, smoothedRms, smoothedBass);
+      drawStarField(width, height, smoothedRms, dt);
+      drawShootingStars(width, height, dt);
+
+      // Intensity pulse overlay
+      if (pulseIntensity > 0.1 || currentIntensity > 0.5) {
+        const overlayAlpha = pulseIntensity * 0.1 + (currentIntensity > 0.7 ? (currentIntensity - 0.7) * 0.15 : 0);
+        const pulseGradient = ctx.createRadialGradient(
+          width / 2, height / 2, 0,
+          width / 2, height / 2, Math.max(width, height)
+        );
+        const pulseHue = lerp(260, 30, currentIntensity);
+        pulseGradient.addColorStop(0, `hsla(${pulseHue}, 70%, 60%, ${overlayAlpha})`);
+        pulseGradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = pulseGradient;
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      if (isPlaying) updateProgress();
+
+      requestAnimationFrame(render);
+    }
+
+    function updateProgress() {
+      const position = Tone.Transport.position;
+      const parts = position.split(':');
+      const bar = parseInt(parts[0]);
+      const beat = parseInt(parts[1]);
+      const progressBars = bar + beat / 4;
+      const percent = (progressBars / totalBars) * 100;
+
+      document.getElementById('playhead').style.left = `${Math.min(percent, 100)}%`;
+
+      const bpm = Tone.Transport.bpm.value;
+      const secondsPerBar = (60 / bpm) * 4;
+      const currentSeconds = progressBars * secondsPerBar;
+      const totalSeconds = totalBars * secondsPerBar;
+
+      const formatTime = (s) => {
+        const m = Math.floor(s / 60);
+        const sec = Math.floor(s % 60).toString().padStart(2, '0');
+        return `${m}:${sec}`;
+      };
+
+      document.getElementById('sectionTime').textContent =
+        `${formatTime(currentSeconds)} / ${formatTime(totalSeconds)}`;
+    }
+
+    // ============================================================================
+    // EVENT LISTENERS
+    // ============================================================================
+
+    document.getElementById('playBtn').addEventListener('click', async () => {
+      if (isPlaying) {
+        stopPlayback();
+      } else {
+        if (!isInitialized) await initAudio();
+        Tone.Transport.position = 0;
+        currentSectionIndex = 0;
+        targetIntensity = songStructure[0].intensity;
+        applySection('stillness', Tone.now());
+        updateSectionDisplay(songStructure[0], 0);
+        startPlayback();
+      }
+    });
+
+    document.getElementById('volumeSlider').addEventListener('input', (e) => {
+      const vol = parseFloat(e.target.value);
+      Tone.Destination.volume.value = vol;
+      document.getElementById('volVal').textContent = `${vol} dB`;
+    });
+
+    document.getElementById('bpmSlider').addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      document.getElementById('bpmVal').textContent = val;
+      Tone.Transport.bpm.value = val;
+    });
+
+    document.addEventListener('keydown', async (e) => {
+      if (e.key === ' ') {
+        e.preventDefault();
+        if (isPlaying) stopPlayback();
+        else {
+          if (!isInitialized) await initAudio();
+          Tone.Transport.position = 0;
+          targetIntensity = songStructure[0].intensity;
+          applySection('stillness', Tone.now());
+          updateSectionDisplay(songStructure[0], 0);
+          startPlayback();
+        }
+      }
+
+      const num = parseInt(e.key);
+      if (num >= 1 && num <= 9 && isInitialized) {
+        jumpToSection(num - 1);
+      }
+    });
+
+    canvas.addEventListener('touchstart', async (e) => {
+      if (!isPlaying) {
+        e.preventDefault();
+        if (!isInitialized) await initAudio();
+        Tone.Transport.position = 0;
+        targetIntensity = songStructure[0].intensity;
+        applySection('stillness', Tone.now());
+        updateSectionDisplay(songStructure[0], 0);
+        startPlayback();
+      }
+    }, { passive: false });
+
+    function buildInitialTimeline() {
+      const timeline = document.getElementById('timeline');
+      timeline.innerHTML = '<div class="playhead" id="playhead"></div>';
+
+      songStructure.forEach((section) => {
+        const div = document.createElement('div');
+        div.className = `timeline-section ${section.name}`;
+        div.style.width = `${(section.bars / totalBars) * 100}%`;
+        div.textContent = section.label;
+        timeline.appendChild(div);
+      });
+    }
+
+    buildInitialTimeline();
+
+    window.addEventListener('beforeunload', () => {
+      if (isPlaying) stopPlayback();
+    });
+
+    render();
+  </script>
+</body>
+</html>
