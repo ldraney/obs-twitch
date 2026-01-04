@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Swing - Demo</title>
+  <script src="https://unpkg.com/tone@14"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #e94560; margin-bottom: 10px; }
+    h2 { color: #4ecdc4; margin-top: 30px; }
+    .subtitle { color: #888; margin-bottom: 30px; }
+
+    .section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 15px 0;
+    }
+
+    .control {
+      background: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .control label {
+      display: block;
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    .control .value {
+      color: #e94560;
+      font-weight: bold;
+      float: right;
+    }
+    .control input[type="range"] {
+      width: 100%;
+      margin-top: 5px;
+    }
+
+    button {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      margin: 5px;
+      transition: transform 0.1s, background 0.2s;
+    }
+    button:hover { background: #ff6b6b; transform: scale(1.02); }
+    button:active { transform: scale(0.98); }
+    button:disabled { background: #444; cursor: not-allowed; transform: none; }
+    button.secondary {
+      background: #4ecdc4;
+      color: #1a1a2e;
+    }
+    button.secondary:hover { background: #6ee7df; }
+    button.active {
+      box-shadow: 0 0 15px rgba(233, 69, 96, 0.5);
+    }
+
+    .type-toggle {
+      display: flex;
+      gap: 10px;
+      margin: 15px 0;
+    }
+    .type-toggle button {
+      flex: 1;
+      background: rgba(78, 205, 196, 0.2);
+      color: #4ecdc4;
+      border: 2px solid #4ecdc4;
+    }
+    .type-toggle button.selected {
+      background: #4ecdc4;
+      color: #1a1a2e;
+    }
+    .type-toggle button:hover:not(.selected) {
+      background: rgba(78, 205, 196, 0.3);
+    }
+
+    #status {
+      text-align: center;
+      padding: 10px;
+      color: #888;
+      font-size: 14px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+
+    .info-box {
+      background: rgba(78, 205, 196, 0.1);
+      border-left: 4px solid #4ecdc4;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .info-box.tip {
+      background: rgba(233, 69, 96, 0.1);
+      border-left-color: #e94560;
+    }
+    .info-box.important {
+      background: rgba(255, 193, 7, 0.1);
+      border-left-color: #ffc107;
+    }
+
+    /* Timing visualization */
+    .timing-visual {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      margin: 20px 0;
+      padding: 20px;
+      overflow: hidden;
+    }
+    .timing-row {
+      display: flex;
+      align-items: center;
+      margin: 15px 0;
+    }
+    .timing-label {
+      width: 100px;
+      color: #888;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+    .timing-track {
+      flex: 1;
+      height: 40px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 4px;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .timing-marker {
+      width: 2px;
+      height: 100%;
+      background: #333;
+      position: absolute;
+    }
+    .timing-marker.beat {
+      background: #555;
+      width: 2px;
+    }
+    .timing-note {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #e94560;
+      transform: translateX(-50%);
+      transition: left 0.3s ease-out;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    .timing-note.off-beat {
+      background: #4ecdc4;
+    }
+    .timing-note.active {
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.8);
+      transform: translateX(-50%) scale(1.2);
+    }
+    .timing-note.off-beat.active {
+      box-shadow: 0 0 20px rgba(78, 205, 196, 0.8);
+    }
+
+    /* Swing amount indicator */
+    .swing-indicator {
+      text-align: center;
+      background: rgba(0,0,0,0.2);
+      padding: 20px;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+    .swing-value {
+      font-size: 48px;
+      font-weight: bold;
+      color: #e94560;
+    }
+    .swing-label {
+      color: #888;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    .swing-description {
+      color: #4ecdc4;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+
+    /* Preset buttons */
+    .presets {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 15px 0;
+    }
+    .preset-btn {
+      min-width: 120px;
+    }
+    .preset-btn.active {
+      background: #e94560;
+      color: white;
+      border-color: #e94560;
+    }
+
+    /* A/B comparison */
+    .ab-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 20px 0;
+    }
+    .ab-box {
+      background: rgba(0,0,0,0.2);
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      border: 2px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .ab-box.active {
+      border-color: #e94560;
+    }
+    .ab-box h3 {
+      margin: 0 0 10px 0;
+      color: #888;
+    }
+    .ab-box h3 span {
+      color: #e94560;
+    }
+    .ab-box.swing-on h3 span {
+      color: #4ecdc4;
+    }
+
+    /* Transport display */
+    .transport {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .transport-display {
+      background: rgba(0,0,0,0.3);
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .transport-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #e94560;
+    }
+    .transport-label {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+    }
+
+    /* Playhead */
+    .playhead {
+      position: absolute;
+      width: 3px;
+      height: 100%;
+      background: #fff;
+      top: 0;
+      left: 0;
+      transition: left 0.05s linear;
+      box-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+
+    @media (max-width: 600px) {
+      .ab-container {
+        grid-template-columns: 1fr;
+      }
+      .timing-label {
+        width: 60px;
+        font-size: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Swing</h1>
+    <p class="subtitle">The secret sauce of lofi groove - delaying off-beat notes for that head-nodding feel</p>
+
+    <div id="status">Click anywhere or press a key to start audio</div>
+
+    <div class="section">
+      <h2>1. What Is Swing?</h2>
+      <p>Swing delays the <strong>off-beat notes</strong> (the "ands" between beats), creating a bouncy, human feel instead of robotic timing.</p>
+
+      <div class="timing-visual">
+        <div class="timing-row">
+          <div class="timing-label">Straight</div>
+          <div class="timing-track" id="straightTrack">
+            <!-- Beat markers and notes added by JS -->
+          </div>
+        </div>
+        <div class="timing-row">
+          <div class="timing-label">With Swing</div>
+          <div class="timing-track" id="swungTrack">
+            <!-- Beat markers and notes added by JS -->
+          </div>
+        </div>
+      </div>
+
+      <div class="info-box important">
+        <strong>Key insight:</strong> The red circles are on-beat notes (1, 2, 3, 4). The teal circles are off-beats ("ands").
+        Watch how swing pushes the teal notes later!
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>2. Swing Amount</h2>
+      <p>Adjust how much the off-beat notes are delayed. Try each preset to hear the difference!</p>
+
+      <div class="swing-indicator">
+        <div class="swing-value" id="swingValue">0.00</div>
+        <div class="swing-label">Tone.Transport.swing</div>
+        <div class="swing-description" id="swingDesc">Perfectly straight - no swing</div>
+      </div>
+
+      <div class="controls">
+        <div class="control" style="grid-column: span 2;">
+          <label>Swing Amount <span class="value" id="swingSliderVal">0.00</span></label>
+          <input type="range" id="swingSlider" min="0" max="0.5" step="0.01" value="0">
+        </div>
+      </div>
+
+      <div class="presets">
+        <button class="secondary preset-btn active" data-swing="0" data-name="Straight">Straight</button>
+        <button class="secondary preset-btn" data-swing="0.12" data-name="Subtle Lofi">Subtle Lofi</button>
+        <button class="secondary preset-btn" data-swing="0.2" data-name="Medium Groove">Medium Groove</button>
+        <button class="secondary preset-btn" data-swing="0.35" data-name="Heavy Swing">Heavy Swing</button>
+      </div>
+
+      <div class="info-box tip">
+        <strong>Lofi tip:</strong> Start with 0.12-0.2 for that classic lofi feel. Higher values sound more jazzy.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>3. Swing Subdivision</h2>
+      <p>Choose which note value gets swung - eighth notes (slower patterns) or sixteenth notes (faster patterns).</p>
+
+      <div class="type-toggle">
+        <button id="sub8n" class="selected">Eighth Notes (8n)</button>
+        <button id="sub16n">Sixteenth Notes (16n)</button>
+      </div>
+
+      <div class="info-box">
+        <strong>When to use each:</strong>
+        <br>- <strong>8n:</strong> Classic swing feel, works for most lofi beats
+        <br>- <strong>16n:</strong> For faster hi-hat patterns where you want swing on the 16th notes
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>4. A/B Comparison</h2>
+      <p>The best way to understand swing is to hear it. Play the same pattern with swing OFF, then ON.</p>
+
+      <div class="ab-container">
+        <div class="ab-box" id="abOff">
+          <h3>Swing <span>OFF</span></h3>
+          <button id="playOff">Play Straight</button>
+          <p style="color: #666; font-size: 13px; margin-top: 10px;">Robotic, quantized timing</p>
+        </div>
+        <div class="ab-box swing-on" id="abOn">
+          <h3>Swing <span>ON</span></h3>
+          <button id="playOn" class="secondary">Play With Swing</button>
+          <p style="color: #666; font-size: 13px; margin-top: 10px;">Groovy, human feel</p>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 15px;">
+        <button id="playLoop" class="active">Start Continuous Loop</button>
+        <button id="toggleSwing" class="secondary">Toggle Swing (currently OFF)</button>
+      </div>
+
+      <div class="transport">
+        <div class="transport-display">
+          <div class="transport-value" id="bpmDisplay">85</div>
+          <div class="transport-label">BPM</div>
+        </div>
+        <div class="transport-display">
+          <div class="transport-value" id="swingDisplay">0%</div>
+          <div class="transport-label">Swing</div>
+        </div>
+        <div class="transport-display">
+          <div class="transport-value" id="subDisplay">8n</div>
+          <div class="transport-label">Subdivision</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>5. Tempo Control</h2>
+      <p>Swing feels different at different tempos. Slower tempos make swing more noticeable.</p>
+
+      <div class="controls">
+        <div class="control">
+          <label>Tempo <span class="value" id="tempoVal">85 BPM</span></label>
+          <input type="range" id="tempoSlider" min="60" max="120" step="1" value="85">
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Understanding the Feel</h2>
+
+      <div class="info-box">
+        <strong>0 (Straight):</strong> Perfect machine timing. Every note lands exactly on the grid.
+        Good for electronic music, but sounds lifeless for lofi.
+      </div>
+
+      <div class="info-box tip">
+        <strong>0.12-0.2 (Subtle Lofi):</strong> The sweet spot! Notes feel relaxed and human without
+        being obviously swung. This is where most lofi beats live.
+      </div>
+
+      <div class="info-box">
+        <strong>0.3-0.4 (Medium Groove):</strong> Clear bounce to the rhythm. Works well for
+        jazz-influenced lofi and neo-soul vibes.
+      </div>
+
+      <div class="info-box important">
+        <strong>0.5 (Triplet Feel):</strong> Maximum swing - off-beats land almost on triplet positions.
+        Very jazzy, may be too much for chill lofi.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global state
+    let hihat = null;
+    let kick = null;
+    let isInitialized = false;
+    let isPlaying = false;
+    let currentSwing = 0;
+    let currentSubdivision = '8n';
+    let loopPart = null;
+
+    // Swing descriptions
+    const swingDescriptions = {
+      0: 'Perfectly straight - no swing',
+      0.05: 'Barely perceptible groove',
+      0.1: 'Subtle human feel',
+      0.12: 'Classic subtle lofi',
+      0.15: 'Sweet spot for chill beats',
+      0.2: 'Medium groove - head nodding',
+      0.25: 'More pronounced bounce',
+      0.3: 'Strong swing feel',
+      0.35: 'Heavy groove - jazzy',
+      0.4: 'Very swung - jazz territory',
+      0.45: 'Near-triplet feel',
+      0.5: 'Maximum swing - full triplet'
+    };
+
+    function getSwingDescription(value) {
+      const keys = Object.keys(swingDescriptions).map(Number).sort((a, b) => a - b);
+      let closest = keys[0];
+      for (const key of keys) {
+        if (Math.abs(key - value) < Math.abs(closest - value)) {
+          closest = key;
+        }
+      }
+      return swingDescriptions[closest];
+    }
+
+    // Initialize audio
+    async function initAudio() {
+      if (isInitialized) return;
+
+      await Tone.start();
+
+      // Create hi-hat sound
+      hihat = new Tone.MetalSynth({
+        frequency: 200,
+        envelope: {
+          attack: 0.001,
+          decay: 0.05,
+          release: 0.01
+        },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5
+      }).toDestination();
+      hihat.volume.value = -12;
+
+      // Create kick for reference
+      kick = new Tone.MembraneSynth({
+        pitchDecay: 0.05,
+        octaves: 6,
+        oscillator: { type: 'sine' },
+        envelope: {
+          attack: 0.001,
+          decay: 0.3,
+          sustain: 0,
+          release: 0.1
+        }
+      }).toDestination();
+      kick.volume.value = -6;
+
+      // Set up transport
+      Tone.Transport.bpm.value = 85;
+      Tone.Transport.swing = 0;
+      Tone.Transport.swingSubdivision = '8n';
+
+      isInitialized = true;
+      updateStatus('Ready! Try the presets or adjust the swing slider.');
+      createTimingVisualization();
+    }
+
+    function updateStatus(msg) {
+      document.getElementById('status').textContent = msg;
+    }
+
+    // Create timing visualization
+    function createTimingVisualization() {
+      const tracks = ['straightTrack', 'swungTrack'];
+
+      tracks.forEach((trackId, trackIndex) => {
+        const track = document.getElementById(trackId);
+        track.innerHTML = '';
+
+        // Add beat markers (8 eighth notes = 1 bar)
+        for (let i = 0; i < 8; i++) {
+          const marker = document.createElement('div');
+          marker.className = 'timing-marker' + (i % 2 === 0 ? ' beat' : '');
+          marker.style.left = `${(i / 8) * 100}%`;
+          track.appendChild(marker);
+        }
+
+        // Add notes
+        for (let i = 0; i < 8; i++) {
+          const note = document.createElement('div');
+          note.className = 'timing-note' + (i % 2 === 1 ? ' off-beat' : '');
+          note.id = `${trackId}-note-${i}`;
+          note.textContent = i % 2 === 0 ? (i / 2 + 1) : '&';
+
+          // Calculate position
+          let position = (i / 8) * 100 + (100 / 16); // Center in the subdivision
+
+          // Apply swing to off-beats on the swung track
+          if (trackId === 'swungTrack' && i % 2 === 1) {
+            const swingOffset = currentSwing * (100 / 8) * 0.5;
+            position += swingOffset;
+          }
+
+          note.style.left = `${position}%`;
+          track.appendChild(note);
+        }
+
+        // Add playhead
+        const playhead = document.createElement('div');
+        playhead.className = 'playhead';
+        playhead.id = `${trackId}-playhead`;
+        playhead.style.display = 'none';
+        track.appendChild(playhead);
+      });
+    }
+
+    // Update visualization with current swing
+    function updateVisualization() {
+      for (let i = 0; i < 8; i++) {
+        const note = document.getElementById(`swungTrack-note-${i}`);
+        if (note) {
+          let position = (i / 8) * 100 + (100 / 16);
+
+          if (i % 2 === 1) {
+            const swingOffset = currentSwing * (100 / 8) * 0.5;
+            position += swingOffset;
+          }
+
+          note.style.left = `${position}%`;
+        }
+      }
+    }
+
+    // Set swing value
+    function setSwing(value, updateSlider = true) {
+      currentSwing = value;
+      Tone.Transport.swing = value;
+
+      // Update UI
+      document.getElementById('swingValue').textContent = value.toFixed(2);
+      document.getElementById('swingDesc').textContent = getSwingDescription(value);
+      document.getElementById('swingDisplay').textContent = Math.round(value * 100) + '%';
+      document.getElementById('swingSliderVal').textContent = value.toFixed(2);
+
+      if (updateSlider) {
+        document.getElementById('swingSlider').value = value;
+      }
+
+      // Update preset buttons
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        const presetSwing = parseFloat(btn.dataset.swing);
+        btn.classList.toggle('active', Math.abs(presetSwing - value) < 0.01);
+      });
+
+      // Update toggle button
+      const toggleBtn = document.getElementById('toggleSwing');
+      toggleBtn.textContent = `Toggle Swing (currently ${value > 0 ? 'ON' : 'OFF'})`;
+
+      // Update visualization
+      updateVisualization();
+    }
+
+    // Set subdivision
+    function setSubdivision(sub) {
+      currentSubdivision = sub;
+      Tone.Transport.swingSubdivision = sub;
+
+      document.getElementById('sub8n').classList.toggle('selected', sub === '8n');
+      document.getElementById('sub16n').classList.toggle('selected', sub === '16n');
+      document.getElementById('subDisplay').textContent = sub;
+    }
+
+    // Play pattern once
+    async function playPattern(withSwing) {
+      if (!isInitialized) await initAudio();
+
+      // Temporarily set swing
+      const originalSwing = Tone.Transport.swing;
+      Tone.Transport.swing = withSwing ? currentSwing : 0;
+
+      // Highlight active box
+      document.getElementById('abOff').classList.toggle('active', !withSwing);
+      document.getElementById('abOn').classList.toggle('active', withSwing);
+
+      // Play 8 eighth notes (1 bar)
+      const now = Tone.now();
+      const eighthNote = 60 / Tone.Transport.bpm.value / 2;
+
+      for (let i = 0; i < 8; i++) {
+        let time = now + (i * eighthNote);
+
+        // Apply swing manually for one-shot playback
+        if (withSwing && i % 2 === 1) {
+          time += eighthNote * currentSwing * 0.5;
+        }
+
+        // Schedule hi-hat
+        Tone.Transport.scheduleOnce((t) => {
+          hihat.triggerAttackRelease('32n', t, i % 2 === 0 ? 0.5 : 0.3);
+
+          // Animate note
+          const trackId = withSwing ? 'swungTrack' : 'straightTrack';
+          const note = document.getElementById(`${trackId}-note-${i}`);
+          if (note) {
+            note.classList.add('active');
+            setTimeout(() => note.classList.remove('active'), 100);
+          }
+        }, time);
+
+        // Add kick on beats 1 and 3
+        if (i === 0 || i === 4) {
+          Tone.Transport.scheduleOnce((t) => {
+            kick.triggerAttackRelease('C1', '8n', t);
+          }, time);
+        }
+      }
+
+      // Start transport briefly
+      Tone.Transport.start();
+      setTimeout(() => {
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+        Tone.Transport.swing = originalSwing;
+        document.getElementById('abOff').classList.remove('active');
+        document.getElementById('abOn').classList.remove('active');
+      }, eighthNote * 9 * 1000);
+    }
+
+    // Continuous loop
+    function startLoop() {
+      if (loopPart) {
+        loopPart.dispose();
+      }
+
+      // Create hi-hat pattern
+      loopPart = new Tone.Sequence((time, idx) => {
+        const velocity = idx % 2 === 0 ? 0.5 : 0.3;
+        hihat.triggerAttackRelease('32n', time, velocity);
+
+        // Kick on 1 and 3
+        if (idx === 0 || idx === 4) {
+          kick.triggerAttackRelease('C1', '8n', time);
+        }
+
+        // Animate current swing state
+        Tone.Draw.schedule(() => {
+          // Clear all active states
+          document.querySelectorAll('.timing-note').forEach(n => n.classList.remove('active'));
+
+          // Highlight current note on both tracks
+          const straightNote = document.getElementById(`straightTrack-note-${idx}`);
+          const swungNote = document.getElementById(`swungTrack-note-${idx}`);
+          if (straightNote) straightNote.classList.add('active');
+          if (swungNote) swungNote.classList.add('active');
+        }, time);
+      }, [0, 1, 2, 3, 4, 5, 6, 7], '8n');
+
+      loopPart.start(0);
+      Tone.Transport.start();
+      isPlaying = true;
+
+      document.getElementById('playLoop').textContent = 'Stop Loop';
+      document.getElementById('playLoop').classList.add('active');
+    }
+
+    function stopLoop() {
+      if (loopPart) {
+        loopPart.stop();
+        loopPart.dispose();
+        loopPart = null;
+      }
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      isPlaying = false;
+
+      document.getElementById('playLoop').textContent = 'Start Continuous Loop';
+      document.getElementById('playLoop').classList.remove('active');
+
+      // Clear active states
+      document.querySelectorAll('.timing-note').forEach(n => n.classList.remove('active'));
+    }
+
+    // Event listeners
+    function setupEventListeners() {
+      // Swing slider
+      document.getElementById('swingSlider').addEventListener('input', (e) => {
+        setSwing(parseFloat(e.target.value), false);
+      });
+
+      // Preset buttons
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+          if (!isInitialized) await initAudio();
+          const swingVal = parseFloat(this.dataset.swing);
+          setSwing(swingVal);
+          updateStatus(`Preset: ${this.dataset.name} (swing = ${swingVal})`);
+        });
+      });
+
+      // Subdivision toggle
+      document.getElementById('sub8n').addEventListener('click', () => setSubdivision('8n'));
+      document.getElementById('sub16n').addEventListener('click', () => setSubdivision('16n'));
+
+      // A/B comparison
+      document.getElementById('playOff').addEventListener('click', async () => {
+        if (!isInitialized) await initAudio();
+        if (isPlaying) stopLoop();
+        playPattern(false);
+      });
+
+      document.getElementById('playOn').addEventListener('click', async () => {
+        if (!isInitialized) await initAudio();
+        if (isPlaying) stopLoop();
+        // Ensure swing is applied
+        if (currentSwing === 0) {
+          setSwing(0.2);
+        }
+        playPattern(true);
+      });
+
+      // Continuous loop
+      document.getElementById('playLoop').addEventListener('click', async () => {
+        if (!isInitialized) await initAudio();
+
+        if (isPlaying) {
+          stopLoop();
+        } else {
+          startLoop();
+        }
+      });
+
+      // Toggle swing
+      document.getElementById('toggleSwing').addEventListener('click', async () => {
+        if (!isInitialized) await initAudio();
+
+        if (currentSwing > 0) {
+          setSwing(0);
+        } else {
+          setSwing(0.2);
+        }
+      });
+
+      // Tempo slider
+      document.getElementById('tempoSlider').addEventListener('input', (e) => {
+        const bpm = parseInt(e.target.value);
+        Tone.Transport.bpm.value = bpm;
+        document.getElementById('tempoVal').textContent = bpm + ' BPM';
+        document.getElementById('bpmDisplay').textContent = bpm;
+      });
+
+      // Init on first interaction
+      document.addEventListener('click', async () => {
+        if (!isInitialized) await initAudio();
+      }, { once: true });
+
+      // Keyboard shortcuts
+      document.addEventListener('keydown', async (e) => {
+        if (!isInitialized) await initAudio();
+
+        switch(e.key.toLowerCase()) {
+          case ' ':
+            e.preventDefault();
+            if (isPlaying) stopLoop(); else startLoop();
+            break;
+          case 's':
+            setSwing(currentSwing > 0 ? 0 : 0.2);
+            break;
+          case '1':
+            setSwing(0);
+            break;
+          case '2':
+            setSwing(0.12);
+            break;
+          case '3':
+            setSwing(0.2);
+            break;
+          case '4':
+            setSwing(0.35);
+            break;
+        }
+      });
+    }
+
+    // Initialize
+    setupEventListeners();
+
+    // Create initial visualization (will be recreated after audio init)
+    createTimingVisualization();
+  </script>
+</body>
+</html>

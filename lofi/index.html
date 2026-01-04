@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lofi Generator</title>
+  <script src="https://unpkg.com/tone@14"></script>
+  <style>
+    body {
+      background: #1a1a2e;
+      color: #eee;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    button {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 20px 40px;
+      font-size: 24px;
+      cursor: pointer;
+      border-radius: 8px;
+      margin: 10px;
+    }
+    button:hover { background: #ff6b6b; }
+    button:disabled { background: #666; cursor: not-allowed; }
+    #status { margin-top: 20px; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <h1>Lofi Generator</h1>
+  <button id="start">Start Lofi</button>
+  <button id="stop" disabled>Stop</button>
+  <div id="status">Click Start to play</div>
+
+  <script>
+    // Jazzy chords
+    const chords = [
+      ['D3', 'F3', 'A3', 'C4', 'E4'],
+      ['G3', 'B3', 'D4', 'F4', 'A4'],
+      ['C3', 'E3', 'G3', 'B3', 'D4'],
+      ['A2', 'C3', 'E3', 'G3', 'B3'],
+      ['F3', 'A3', 'C4', 'E4', 'G4'],
+      ['E3', 'G3', 'B3', 'D4', 'F4'],
+    ];
+
+    let playing = false;
+    let synth, bass, kick, hihat, noise, loops = [];
+
+    async function startLofi() {
+      try {
+        await Tone.start();
+        document.getElementById('status').textContent = 'Loading...';
+
+        // Simple master volume at 10%
+        const vol = new Tone.Volume(-20).toDestination();
+
+        // Rhodes-like synth
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'triangle' },
+          envelope: { attack: 0.1, decay: 0.3, sustain: 0.5, release: 1 }
+        }).connect(vol);
+
+        // Bass
+        bass = new Tone.Synth({
+          oscillator: { type: 'triangle' },
+          envelope: { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.5 }
+        }).connect(vol);
+
+        // Kick
+        kick = new Tone.MembraneSynth().connect(vol);
+
+        // Hihat
+        hihat = new Tone.NoiseSynth({
+          noise: { type: 'white' },
+          envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 }
+        }).connect(vol);
+
+        // Vinyl noise
+        noise = new Tone.Noise('brown').connect(vol);
+        noise.volume.value = -35;
+        noise.start();
+
+        Tone.Transport.bpm.value = 72;
+        Tone.Transport.swing = 0.2;
+
+        let chordIdx = 0;
+
+        // Chord loop
+        const chordLoop = new Tone.Loop((time) => {
+          synth.triggerAttackRelease(chords[chordIdx], '2n', time, 0.3);
+          bass.triggerAttackRelease(chords[chordIdx][0].replace(/[0-9]/, '2'), '2n', time, 0.5);
+          chordIdx = (chordIdx + 1) % chords.length;
+        }, '2n').start(0);
+        loops.push(chordLoop);
+
+        // Kick on 1 and 3
+        const kickLoop = new Tone.Loop((time) => {
+          kick.triggerAttackRelease('C1', '8n', time, 0.8);
+        }, '2n').start(0);
+        loops.push(kickLoop);
+
+        // Hihat
+        const hatLoop = new Tone.Loop((time) => {
+          hihat.triggerAttackRelease('16n', time, 0.3);
+        }, '8n').start('8n');
+        loops.push(hatLoop);
+
+        Tone.Transport.start();
+
+        playing = true;
+        document.getElementById('status').textContent = 'Playing lofi beats...';
+        document.getElementById('start').disabled = true;
+        document.getElementById('stop').disabled = false;
+      } catch (e) {
+        document.getElementById('status').textContent = 'Error: ' + e.message;
+        console.error(e);
+      }
+    }
+
+    function stopLofi() {
+      Tone.Transport.stop();
+      loops.forEach(l => l.dispose());
+      loops = [];
+      if (synth) synth.dispose();
+      if (bass) bass.dispose();
+      if (kick) kick.dispose();
+      if (hihat) hihat.dispose();
+      if (noise) { noise.stop(); noise.dispose(); }
+
+      playing = false;
+      document.getElementById('status').textContent = 'Stopped';
+      document.getElementById('start').disabled = false;
+      document.getElementById('stop').disabled = true;
+    }
+
+    document.getElementById('start').addEventListener('click', startLofi);
+    document.getElementById('stop').addEventListener('click', stopLofi);
+  </script>
+</body>
+</html>

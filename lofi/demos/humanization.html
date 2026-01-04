@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Humanization - Demo</title>
+  <script src="https://unpkg.com/tone@14"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .container { max-width: 1000px; margin: 0 auto; }
+    h1 { color: #e94560; margin-bottom: 10px; }
+    h2 { color: #4ecdc4; margin-top: 30px; }
+    .subtitle { color: #888; margin-bottom: 30px; }
+
+    .section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 15px 0;
+    }
+
+    .control {
+      background: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .control label {
+      display: block;
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    .control .value {
+      color: #e94560;
+      font-weight: bold;
+      float: right;
+    }
+    .control input[type="range"] {
+      width: 100%;
+      margin-top: 5px;
+      accent-color: #e94560;
+    }
+    .control.master {
+      background: rgba(233, 69, 96, 0.15);
+      border: 1px solid rgba(233, 69, 96, 0.3);
+    }
+    .control.master input[type="range"] {
+      accent-color: #e94560;
+    }
+
+    button {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      margin: 5px;
+      transition: transform 0.1s, background 0.2s;
+    }
+    button:hover { background: #ff6b6b; transform: scale(1.02); }
+    button:active { transform: scale(0.98); }
+    button:disabled { background: #444; cursor: not-allowed; transform: none; }
+    button.secondary {
+      background: #4ecdc4;
+      color: #1a1a2e;
+    }
+    button.secondary:hover { background: #6ee7df; }
+    button.active {
+      box-shadow: 0 0 15px rgba(233, 69, 96, 0.5);
+    }
+
+    #status {
+      text-align: center;
+      padding: 10px;
+      color: #888;
+      font-size: 14px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+
+    .info-box {
+      background: rgba(78, 205, 196, 0.1);
+      border-left: 4px solid #4ecdc4;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .info-box.tip {
+      background: rgba(233, 69, 96, 0.1);
+      border-left-color: #e94560;
+    }
+    .info-box.warning {
+      background: rgba(255, 193, 7, 0.1);
+      border-left-color: #ffc107;
+    }
+
+    /* A/B Comparison */
+    .ab-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 20px 0;
+    }
+    .ab-box {
+      background: rgba(0,0,0,0.2);
+      padding: 25px;
+      border-radius: 12px;
+      text-align: center;
+      border: 3px solid transparent;
+      transition: all 0.3s;
+    }
+    .ab-box:hover {
+      background: rgba(0,0,0,0.3);
+    }
+    .ab-box.active {
+      border-color: #e94560;
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.3);
+    }
+    .ab-box.humanized.active {
+      border-color: #4ecdc4;
+      box-shadow: 0 0 20px rgba(78, 205, 196, 0.3);
+    }
+    .ab-box h3 {
+      margin: 0 0 15px 0;
+      font-size: 24px;
+    }
+    .ab-box.robotic h3 { color: #888; }
+    .ab-box.humanized h3 { color: #4ecdc4; }
+    .ab-box p {
+      color: #666;
+      font-size: 13px;
+      margin: 15px 0 0 0;
+    }
+
+    /* Presets */
+    .presets {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .preset-btn {
+      background: rgba(78, 205, 196, 0.2);
+      border: 2px solid #4ecdc4;
+      color: #4ecdc4;
+      padding: 10px 20px;
+      font-size: 14px;
+      min-width: 130px;
+    }
+    .preset-btn:hover {
+      background: rgba(78, 205, 196, 0.3);
+    }
+    .preset-btn.active {
+      background: #4ecdc4;
+      color: #1a1a2e;
+    }
+
+    /* Timing visualization */
+    .timing-visual {
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .timing-row {
+      display: flex;
+      align-items: center;
+      margin: 12px 0;
+    }
+    .timing-label {
+      width: 100px;
+      color: #888;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+    .timing-track {
+      flex: 1;
+      height: 50px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .timing-grid-line {
+      position: absolute;
+      width: 2px;
+      height: 100%;
+      background: #333;
+    }
+    .timing-grid-line.beat {
+      background: #555;
+      width: 3px;
+    }
+    .timing-note {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      transform: translateX(-50%);
+      transition: left 0.15s ease-out;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: bold;
+      color: #1a1a2e;
+    }
+    .timing-note.kick { background: #e94560; }
+    .timing-note.snare { background: #ffd700; }
+    .timing-note.hihat { background: #4ecdc4; height: 14px; width: 14px; }
+    .timing-note.chord { background: #9b59b6; }
+    .timing-note.active {
+      transform: translateX(-50%) scale(1.4);
+      box-shadow: 0 0 15px currentColor;
+    }
+
+    /* Offset display */
+    .offset-display {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .offset-item {
+      background: rgba(0,0,0,0.2);
+      padding: 15px 25px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .offset-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #e94560;
+    }
+    .offset-label {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+      margin-top: 5px;
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin: 15px 0;
+      font-size: 12px;
+      color: #888;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .legend-dot.kick { background: #e94560; }
+    .legend-dot.snare { background: #ffd700; }
+    .legend-dot.hihat { background: #4ecdc4; }
+    .legend-dot.chord { background: #9b59b6; }
+
+    /* Transport */
+    .transport {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin: 20px 0;
+      align-items: center;
+    }
+    .transport-display {
+      background: rgba(0,0,0,0.3);
+      padding: 8px 16px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .transport-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #e94560;
+    }
+    .transport-label {
+      font-size: 10px;
+      color: #666;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 700px) {
+      .ab-container {
+        grid-template-columns: 1fr;
+      }
+      .timing-label {
+        width: 70px;
+        font-size: 10px;
+      }
+      .offset-display {
+        gap: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Humanization</h1>
+    <p class="subtitle">Transform robotic patterns into grooves that breathe with controlled imperfection</p>
+
+    <div id="status">Click anywhere to start audio engine</div>
+
+    <div class="section">
+      <h2>1. A/B Comparison</h2>
+      <p>Hear the dramatic difference between perfectly quantized and humanized patterns. Same notes, completely different feel.</p>
+
+      <div class="ab-container">
+        <div class="ab-box robotic" id="abRobotic">
+          <h3>Robotic</h3>
+          <button id="playRobotic">Play Quantized</button>
+          <p>Perfect machine timing - cold and lifeless</p>
+        </div>
+        <div class="ab-box humanized" id="abHumanized">
+          <h3>Humanized</h3>
+          <button id="playHumanized" class="secondary">Play Humanized</button>
+          <p>Natural variations - warm and alive</p>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <strong>Listen for:</strong> The humanized version has subtle timing drift, velocity changes, and slight pitch wobbles. It feels like a real musician played it.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>2. Humanization Controls</h2>
+      <p>Adjust each dimension of humanization independently or use the master slider.</p>
+
+      <div class="controls">
+        <div class="control master" style="grid-column: span 2;">
+          <label>Master Humanization <span class="value" id="masterVal">50%</span></label>
+          <input type="range" id="masterSlider" min="0" max="100" value="50">
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="control">
+          <label>Timing Variation <span class="value" id="timingVal">20ms</span></label>
+          <input type="range" id="timingSlider" min="0" max="50" value="20">
+        </div>
+        <div class="control">
+          <label>Velocity Variation <span class="value" id="velocityVal">15%</span></label>
+          <input type="range" id="velocitySlider" min="0" max="30" value="15">
+        </div>
+        <div class="control">
+          <label>Pitch Variation <span class="value" id="pitchVal">5 cents</span></label>
+          <input type="range" id="pitchSlider" min="0" max="10" value="5">
+        </div>
+      </div>
+
+      <div class="info-box tip">
+        <strong>Tip:</strong> Start subtle! 15-25ms timing, 10-20% velocity, and 3-8 cents pitch is the sweet spot for lofi.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>3. Presets</h2>
+      <p>Try different humanization styles from tight electronic to loose J Dilla "drunk" feel.</p>
+
+      <div class="presets">
+        <button class="preset-btn" data-preset="robotic">Robotic</button>
+        <button class="preset-btn" data-preset="subtle">Subtle Human</button>
+        <button class="preset-btn active" data-preset="standard">Standard Lofi</button>
+        <button class="preset-btn" data-preset="loose">Loose Feel</button>
+        <button class="preset-btn" data-preset="drunk">Drunk (J Dilla)</button>
+      </div>
+
+      <div id="presetDescription" class="info-box" style="display: none;"></div>
+    </div>
+
+    <div class="section">
+      <h2>4. Live Visualization</h2>
+      <p>Watch how humanization shifts notes away from the perfect grid. Grid lines show where notes <em>should</em> be; dots show where they actually play.</p>
+
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot kick"></div> Kick</div>
+        <div class="legend-item"><div class="legend-dot snare"></div> Snare</div>
+        <div class="legend-item"><div class="legend-dot hihat"></div> Hi-hat</div>
+        <div class="legend-item"><div class="legend-dot chord"></div> Chord</div>
+      </div>
+
+      <div class="timing-visual" id="timingVisual">
+        <div class="timing-row">
+          <div class="timing-label">Perfect Grid</div>
+          <div class="timing-track" id="gridTrack"></div>
+        </div>
+        <div class="timing-row">
+          <div class="timing-label">Humanized</div>
+          <div class="timing-track" id="humanTrack"></div>
+        </div>
+      </div>
+
+      <div class="offset-display">
+        <div class="offset-item">
+          <div class="offset-value" id="lastTimingOffset">+0ms</div>
+          <div class="offset-label">Last Timing Offset</div>
+        </div>
+        <div class="offset-item">
+          <div class="offset-value" id="lastVelocityOffset">0%</div>
+          <div class="offset-label">Last Velocity Change</div>
+        </div>
+        <div class="offset-item">
+          <div class="offset-value" id="lastPitchOffset">0c</div>
+          <div class="offset-label">Last Pitch Offset</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>5. Continuous Playback</h2>
+      <p>Start the loop and adjust humanization in real-time to hear the changes.</p>
+
+      <div class="transport">
+        <button id="playLoop" class="active">Start Loop</button>
+        <button id="stopLoop" class="secondary">Stop</button>
+        <div class="transport-display">
+          <div class="transport-value" id="bpmDisplay">85</div>
+          <div class="transport-label">BPM</div>
+        </div>
+        <div class="transport-display">
+          <div class="transport-value" id="swingDisplay">18%</div>
+          <div class="transport-label">Swing</div>
+        </div>
+      </div>
+
+      <div class="info-box warning">
+        <strong>Note:</strong> Humanization is applied on top of swing. The combination creates the ultimate lofi groove!
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global state
+    let isInitialized = false;
+    let isPlaying = false;
+    let kick, snare, hihat, chordSynth;
+    let loopPart = null;
+    let currentStep = 0;
+
+    // Humanization settings
+    let settings = {
+      timing: 20,    // ms
+      velocity: 15,  // percent
+      pitch: 5       // cents
+    };
+
+    // Presets
+    const presets = {
+      robotic: {
+        timing: 0,
+        velocity: 0,
+        pitch: 0,
+        description: 'Perfect machine timing. No variation at all - sounds cold and artificial.'
+      },
+      subtle: {
+        timing: 10,
+        velocity: 8,
+        pitch: 2,
+        description: 'Barely perceptible humanization. Tight but with a hint of life.'
+      },
+      standard: {
+        timing: 20,
+        velocity: 15,
+        pitch: 5,
+        description: 'The lofi sweet spot. Natural feel without being sloppy.'
+      },
+      loose: {
+        timing: 32,
+        velocity: 22,
+        pitch: 7,
+        description: 'Relaxed, laid-back groove. Notes sit behind the beat.'
+      },
+      drunk: {
+        timing: 45,
+        velocity: 28,
+        pitch: 8,
+        description: 'J Dilla-inspired "drunk" timing. Intentionally off-grid for maximum soul.'
+      }
+    };
+
+    // Humanization functions
+    function humanizeTiming(baseTime, amount) {
+      if (amount === 0) return baseTime;
+      const offsetMs = (Math.random() - 0.5) * 2 * amount;
+      return baseTime + (offsetMs / 1000);
+    }
+
+    function humanizeVelocity(baseVel, amount) {
+      if (amount === 0) return baseVel;
+      const variation = amount / 100;
+      const offset = (Math.random() - 0.5) * 2 * variation;
+      return Math.max(0.1, Math.min(1.0, baseVel + offset));
+    }
+
+    function humanizePitch(baseCents, amount) {
+      if (amount === 0) return 0;
+      return (Math.random() - 0.5) * 2 * amount;
+    }
+
+    // Track last offsets for display
+    let lastOffsets = { timing: 0, velocity: 0, pitch: 0 };
+
+    function updateOffsetDisplay() {
+      const sign = lastOffsets.timing >= 0 ? '+' : '';
+      document.getElementById('lastTimingOffset').textContent =
+        `${sign}${Math.round(lastOffsets.timing)}ms`;
+
+      const velSign = lastOffsets.velocity >= 0 ? '+' : '';
+      document.getElementById('lastVelocityOffset').textContent =
+        `${velSign}${Math.round(lastOffsets.velocity)}%`;
+
+      const pitchSign = lastOffsets.pitch >= 0 ? '+' : '';
+      document.getElementById('lastPitchOffset').textContent =
+        `${pitchSign}${lastOffsets.pitch.toFixed(1)}c`;
+    }
+
+    // Initialize audio
+    async function initAudio() {
+      if (isInitialized) return;
+
+      await Tone.start();
+
+      // Kick drum
+      kick = new Tone.MembraneSynth({
+        pitchDecay: 0.05,
+        octaves: 6,
+        oscillator: { type: 'sine' },
+        envelope: {
+          attack: 0.001,
+          decay: 0.3,
+          sustain: 0,
+          release: 0.1
+        }
+      }).toDestination();
+      kick.volume.value = -6;
+
+      // Snare
+      snare = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: {
+          attack: 0.001,
+          decay: 0.15,
+          sustain: 0,
+          release: 0.05
+        }
+      }).toDestination();
+      snare.volume.value = -10;
+
+      // Hi-hat
+      hihat = new Tone.MetalSynth({
+        frequency: 200,
+        envelope: {
+          attack: 0.001,
+          decay: 0.05,
+          release: 0.01
+        },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5
+      }).toDestination();
+      hihat.volume.value = -18;
+
+      // Chord synth (Rhodes-like)
+      chordSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: {
+          attack: 0.02,
+          decay: 0.3,
+          sustain: 0.4,
+          release: 0.8
+        }
+      }).toDestination();
+      chordSynth.volume.value = -12;
+
+      // Transport settings
+      Tone.Transport.bpm.value = 85;
+      Tone.Transport.swing = 0.18;
+      Tone.Transport.swingSubdivision = '16n';
+
+      isInitialized = true;
+      document.getElementById('status').textContent = 'Ready! Try the A/B comparison or start the loop.';
+
+      buildVisualization();
+    }
+
+    function updateStatus(msg) {
+      document.getElementById('status').textContent = msg;
+    }
+
+    // Build timing visualization
+    function buildVisualization() {
+      const gridTrack = document.getElementById('gridTrack');
+      const humanTrack = document.getElementById('humanTrack');
+
+      gridTrack.innerHTML = '';
+      humanTrack.innerHTML = '';
+
+      // Add grid lines (16 sixteenth notes)
+      for (let i = 0; i < 16; i++) {
+        const pos = (i / 16) * 100;
+
+        const gridLine1 = document.createElement('div');
+        gridLine1.className = 'timing-grid-line' + (i % 4 === 0 ? ' beat' : '');
+        gridLine1.style.left = `${pos}%`;
+        gridTrack.appendChild(gridLine1);
+
+        const gridLine2 = document.createElement('div');
+        gridLine2.className = 'timing-grid-line' + (i % 4 === 0 ? ' beat' : '');
+        gridLine2.style.left = `${pos}%`;
+        humanTrack.appendChild(gridLine2);
+      }
+
+      // Pattern: kick on 0, 6, 10; snare on 4, 12; hihat on every 16th; chord on 0
+      const pattern = [
+        { step: 0, type: 'kick', id: 'kick1' },
+        { step: 0, type: 'chord', id: 'chord1' },
+        { step: 0, type: 'hihat', id: 'hh1' },
+        { step: 2, type: 'hihat', id: 'hh2' },
+        { step: 4, type: 'snare', id: 'snare1' },
+        { step: 4, type: 'hihat', id: 'hh3' },
+        { step: 6, type: 'kick', id: 'kick2' },
+        { step: 6, type: 'hihat', id: 'hh4' },
+        { step: 8, type: 'hihat', id: 'hh5' },
+        { step: 10, type: 'kick', id: 'kick3' },
+        { step: 10, type: 'hihat', id: 'hh6' },
+        { step: 12, type: 'snare', id: 'snare2' },
+        { step: 12, type: 'hihat', id: 'hh7' },
+        { step: 14, type: 'hihat', id: 'hh8' }
+      ];
+
+      pattern.forEach(note => {
+        const pos = ((note.step + 0.5) / 16) * 100;
+
+        // Grid note (perfect position)
+        const gridNote = document.createElement('div');
+        gridNote.className = `timing-note ${note.type}`;
+        gridNote.id = `grid-${note.id}`;
+        gridNote.style.left = `${pos}%`;
+        gridTrack.appendChild(gridNote);
+
+        // Human note (will be offset)
+        const humanNote = document.createElement('div');
+        humanNote.className = `timing-note ${note.type}`;
+        humanNote.id = `human-${note.id}`;
+        humanNote.style.left = `${pos}%`;
+        humanTrack.appendChild(humanNote);
+      });
+    }
+
+    // Update humanized note positions in visualization
+    function updateHumanizedPositions() {
+      const pattern = [
+        { step: 0, id: 'kick1' },
+        { step: 0, id: 'chord1' },
+        { step: 0, id: 'hh1' },
+        { step: 2, id: 'hh2' },
+        { step: 4, id: 'snare1' },
+        { step: 4, id: 'hh3' },
+        { step: 6, id: 'kick2' },
+        { step: 6, id: 'hh4' },
+        { step: 8, id: 'hh5' },
+        { step: 10, id: 'kick3' },
+        { step: 10, id: 'hh6' },
+        { step: 12, id: 'snare2' },
+        { step: 12, id: 'hh7' },
+        { step: 14, id: 'hh8' }
+      ];
+
+      pattern.forEach(note => {
+        const el = document.getElementById(`human-${note.id}`);
+        if (el) {
+          const basePos = ((note.step + 0.5) / 16) * 100;
+          // Add random offset based on timing setting
+          const offsetPercent = ((Math.random() - 0.5) * 2 * settings.timing) / 400;
+          el.style.left = `${basePos + offsetPercent * 100}%`;
+        }
+      });
+    }
+
+    // Play a single bar (for A/B comparison)
+    async function playOnce(humanized) {
+      if (!isInitialized) await initAudio();
+
+      // Stop any playing
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+
+      const now = Tone.now() + 0.1;
+      const sixteenth = 60 / Tone.Transport.bpm.value / 4;
+
+      // Chord (Dm7)
+      const chordNotes = ['D3', 'F3', 'A3', 'C4'];
+
+      // Pattern
+      const events = [
+        { time: 0, type: 'kick', vel: 0.95 },
+        { time: 0, type: 'chord', vel: 0.6 },
+        { time: 0, type: 'hihat', vel: 0.7 },
+        { time: 2, type: 'hihat', vel: 0.2 },
+        { time: 4, type: 'snare', vel: 0.85 },
+        { time: 4, type: 'hihat', vel: 0.65 },
+        { time: 6, type: 'kick', vel: 0.7 },
+        { time: 6, type: 'hihat', vel: 0.2 },
+        { time: 8, type: 'hihat', vel: 0.7 },
+        { time: 10, type: 'kick', vel: 0.8 },
+        { time: 10, type: 'hihat', vel: 0.2 },
+        { time: 12, type: 'snare', vel: 0.8 },
+        { time: 12, type: 'hihat', vel: 0.65 },
+        { time: 14, type: 'hihat', vel: 0.2 }
+      ];
+
+      events.forEach(event => {
+        let time = now + event.time * sixteenth;
+        let vel = event.vel;
+        let detune = 0;
+
+        if (humanized) {
+          const timeOffset = humanizeTiming(0, settings.timing) * 1000;
+          time = now + event.time * sixteenth + timeOffset / 1000;
+
+          const velOffset = (Math.random() - 0.5) * 2 * (settings.velocity / 100);
+          vel = Math.max(0.1, Math.min(1, event.vel + velOffset));
+
+          detune = humanizePitch(0, settings.pitch);
+
+          // Update display for last note
+          lastOffsets.timing = timeOffset;
+          lastOffsets.velocity = velOffset * 100;
+          lastOffsets.pitch = detune;
+        }
+
+        switch(event.type) {
+          case 'kick':
+            kick.triggerAttackRelease('C1', '8n', time, vel);
+            break;
+          case 'snare':
+            snare.triggerAttackRelease('8n', time, vel);
+            break;
+          case 'hihat':
+            if (humanized) hihat.detune = detune;
+            hihat.triggerAttackRelease('32n', time, vel);
+            break;
+          case 'chord':
+            if (humanized) chordSynth.set({ detune: detune });
+            chordSynth.triggerAttackRelease(chordNotes, '2n', time, vel);
+            break;
+        }
+      });
+
+      if (humanized) {
+        updateOffsetDisplay();
+        updateHumanizedPositions();
+      }
+    }
+
+    // Continuous loop
+    function startLoop() {
+      if (loopPart) {
+        loopPart.dispose();
+      }
+
+      const events = [
+        { time: '0:0:0', type: 'kick', vel: 0.95, id: 'kick1' },
+        { time: '0:0:0', type: 'chord', vel: 0.6, id: 'chord1' },
+        { time: '0:0:0', type: 'hihat', vel: 0.7, id: 'hh1' },
+        { time: '0:0:2', type: 'hihat', vel: 0.2, id: 'hh2' },
+        { time: '0:1:0', type: 'snare', vel: 0.85, id: 'snare1' },
+        { time: '0:1:0', type: 'hihat', vel: 0.65, id: 'hh3' },
+        { time: '0:1:2', type: 'kick', vel: 0.7, id: 'kick2' },
+        { time: '0:1:2', type: 'hihat', vel: 0.2, id: 'hh4' },
+        { time: '0:2:0', type: 'hihat', vel: 0.7, id: 'hh5' },
+        { time: '0:2:2', type: 'kick', vel: 0.8, id: 'kick3' },
+        { time: '0:2:2', type: 'hihat', vel: 0.2, id: 'hh6' },
+        { time: '0:3:0', type: 'snare', vel: 0.8, id: 'snare2' },
+        { time: '0:3:0', type: 'hihat', vel: 0.65, id: 'hh7' },
+        { time: '0:3:2', type: 'hihat', vel: 0.2, id: 'hh8' }
+      ];
+
+      const chordNotes = ['D3', 'F3', 'A3', 'C4'];
+
+      loopPart = new Tone.Part((time, event) => {
+        // Apply humanization
+        const timeOffset = humanizeTiming(0, settings.timing) * 1000;
+        const humanTime = time + timeOffset / 1000;
+
+        const velOffset = (Math.random() - 0.5) * 2 * (settings.velocity / 100);
+        const vel = Math.max(0.1, Math.min(1, event.vel + velOffset));
+
+        const detune = humanizePitch(0, settings.pitch);
+
+        // Update offsets display
+        lastOffsets.timing = timeOffset;
+        lastOffsets.velocity = velOffset * 100;
+        lastOffsets.pitch = detune;
+
+        // Play sound
+        switch(event.type) {
+          case 'kick':
+            kick.triggerAttackRelease('C1', '8n', humanTime, vel);
+            break;
+          case 'snare':
+            snare.triggerAttackRelease('8n', humanTime, vel);
+            break;
+          case 'hihat':
+            hihat.detune = detune;
+            hihat.triggerAttackRelease('32n', humanTime, vel);
+            break;
+          case 'chord':
+            chordSynth.set({ detune: detune });
+            chordSynth.triggerAttackRelease(chordNotes, '2n', humanTime, vel);
+            break;
+        }
+
+        // Visual feedback
+        Tone.Draw.schedule(() => {
+          updateOffsetDisplay();
+
+          // Highlight notes
+          document.querySelectorAll('.timing-note').forEach(n => n.classList.remove('active'));
+
+          const gridNote = document.getElementById(`grid-${event.id}`);
+          const humanNote = document.getElementById(`human-${event.id}`);
+          if (gridNote) gridNote.classList.add('active');
+          if (humanNote) {
+            humanNote.classList.add('active');
+            // Update position
+            const stepMatch = event.time.match(/0:(\d):(\d)/);
+            if (stepMatch) {
+              const step = parseInt(stepMatch[1]) * 4 + parseInt(stepMatch[2]);
+              const basePos = ((step + 0.5) / 16) * 100;
+              const offsetPercent = timeOffset / 400;
+              humanNote.style.left = `${basePos + offsetPercent}%`;
+            }
+          }
+        }, time);
+
+      }, events);
+
+      loopPart.loop = true;
+      loopPart.loopEnd = '1m';
+      loopPart.start(0);
+
+      Tone.Transport.start();
+      isPlaying = true;
+
+      document.getElementById('playLoop').textContent = 'Playing...';
+      document.getElementById('playLoop').disabled = true;
+    }
+
+    function stopLoop() {
+      if (loopPart) {
+        loopPart.stop();
+        loopPart.dispose();
+        loopPart = null;
+      }
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      isPlaying = false;
+
+      document.getElementById('playLoop').textContent = 'Start Loop';
+      document.getElementById('playLoop').disabled = false;
+
+      // Clear active states
+      document.querySelectorAll('.timing-note').forEach(n => n.classList.remove('active'));
+    }
+
+    // Apply preset
+    function applyPreset(name) {
+      const preset = presets[name];
+      if (!preset) return;
+
+      settings.timing = preset.timing;
+      settings.velocity = preset.velocity;
+      settings.pitch = preset.pitch;
+
+      // Update sliders
+      document.getElementById('timingSlider').value = preset.timing;
+      document.getElementById('velocitySlider').value = preset.velocity;
+      document.getElementById('pitchSlider').value = preset.pitch;
+
+      // Update displays
+      document.getElementById('timingVal').textContent = `${preset.timing}ms`;
+      document.getElementById('velocityVal').textContent = `${preset.velocity}%`;
+      document.getElementById('pitchVal').textContent = `${preset.pitch} cents`;
+
+      // Update master slider (average)
+      const avg = Math.round((preset.timing / 50 + preset.velocity / 30 + preset.pitch / 10) / 3 * 100);
+      document.getElementById('masterSlider').value = avg;
+      document.getElementById('masterVal').textContent = `${avg}%`;
+
+      // Update buttons
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.preset === name);
+      });
+
+      // Show description
+      const descEl = document.getElementById('presetDescription');
+      descEl.innerHTML = `<strong>${name.charAt(0).toUpperCase() + name.slice(1)}:</strong> ${preset.description}`;
+      descEl.style.display = 'block';
+
+      // Update visualization
+      updateHumanizedPositions();
+    }
+
+    // Event listeners
+    function setupEventListeners() {
+      // A/B comparison
+      document.getElementById('playRobotic').addEventListener('click', async () => {
+        if (!isInitialized) await initAudio();
+        if (isPlaying) stopLoop();
+
+        document.getElementById('abRobotic').classList.add('active');
+        document.getElementById('abHumanized').classList.remove('active');
+
+        playOnce(false);
+
+        setTimeout(() => {
+          document.getElementById('abRobotic').classList.remove('active');
+        }, 2500);
+      });
+
+      document.getElementById('playHumanized').addEventListener('click', async () => {
+        if (!isInitialized) await initAudio();
+        if (isPlaying) stopLoop();
+
+        document.getElementById('abHumanized').classList.add('active');
+        document.getElementById('abRobotic').classList.remove('active');
+
+        playOnce(true);
+
+        setTimeout(() => {
+          document.getElementById('abHumanized').classList.remove('active');
+        }, 2500);
+      });
+
+      // Individual sliders
+      document.getElementById('timingSlider').addEventListener('input', (e) => {
+        settings.timing = parseInt(e.target.value);
+        document.getElementById('timingVal').textContent = `${settings.timing}ms`;
+        updateHumanizedPositions();
+      });
+
+      document.getElementById('velocitySlider').addEventListener('input', (e) => {
+        settings.velocity = parseInt(e.target.value);
+        document.getElementById('velocityVal').textContent = `${settings.velocity}%`;
+      });
+
+      document.getElementById('pitchSlider').addEventListener('input', (e) => {
+        settings.pitch = parseInt(e.target.value);
+        document.getElementById('pitchVal').textContent = `${settings.pitch} cents`;
+      });
+
+      // Master slider
+      document.getElementById('masterSlider').addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        document.getElementById('masterVal').textContent = `${val}%`;
+
+        // Scale all parameters
+        settings.timing = Math.round((val / 100) * 50);
+        settings.velocity = Math.round((val / 100) * 30);
+        settings.pitch = Math.round((val / 100) * 10);
+
+        document.getElementById('timingSlider').value = settings.timing;
+        document.getElementById('velocitySlider').value = settings.velocity;
+        document.getElementById('pitchSlider').value = settings.pitch;
+
+        document.getElementById('timingVal').textContent = `${settings.timing}ms`;
+        document.getElementById('velocityVal').textContent = `${settings.velocity}%`;
+        document.getElementById('pitchVal').textContent = `${settings.pitch} cents`;
+
+        updateHumanizedPositions();
+      });
+
+      // Presets
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          applyPreset(btn.dataset.preset);
+        });
+      });
+
+      // Transport
+      document.getElementById('playLoop').addEventListener('click', async () => {
+        if (!isInitialized) await initAudio();
+        if (!isPlaying) startLoop();
+      });
+
+      document.getElementById('stopLoop').addEventListener('click', () => {
+        stopLoop();
+      });
+
+      // Init on first click
+      document.addEventListener('click', async () => {
+        if (!isInitialized) await initAudio();
+      }, { once: true });
+
+      // Keyboard shortcuts
+      document.addEventListener('keydown', async (e) => {
+        if (!isInitialized) await initAudio();
+
+        switch(e.key.toLowerCase()) {
+          case ' ':
+            e.preventDefault();
+            if (isPlaying) stopLoop(); else startLoop();
+            break;
+          case 'r':
+            playOnce(false);
+            break;
+          case 'h':
+            playOnce(true);
+            break;
+          case '1':
+            applyPreset('robotic');
+            break;
+          case '2':
+            applyPreset('subtle');
+            break;
+          case '3':
+            applyPreset('standard');
+            break;
+          case '4':
+            applyPreset('loose');
+            break;
+          case '5':
+            applyPreset('drunk');
+            break;
+        }
+      });
+    }
+
+    // Initialize
+    setupEventListeners();
+
+    // Build visualization on load (will rebuild after audio init)
+    buildVisualization();
+    updateHumanizedPositions();
+  </script>
+</body>
+</html>

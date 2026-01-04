@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Delay - Demo</title>
+  <script src="https://unpkg.com/tone@14"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #e94560; margin-bottom: 10px; }
+    h2 { color: #4ecdc4; margin-top: 30px; }
+    .subtitle { color: #888; margin-bottom: 30px; }
+
+    .section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 15px 0;
+    }
+
+    .control {
+      background: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .control label {
+      display: block;
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    .control .value {
+      color: #e94560;
+      font-weight: bold;
+      float: right;
+    }
+    .control input[type="range"] {
+      width: 100%;
+      margin-top: 5px;
+    }
+    .control select {
+      width: 100%;
+      padding: 8px;
+      background: #2a2a4e;
+      color: #eee;
+      border: 1px solid #444;
+      border-radius: 4px;
+    }
+
+    button {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      margin: 5px;
+      transition: transform 0.1s, background 0.2s;
+    }
+    button:hover { background: #ff6b6b; transform: scale(1.02); }
+    button:active { transform: scale(0.98); }
+    button:disabled { background: #444; cursor: not-allowed; transform: none; }
+    button.secondary {
+      background: #4ecdc4;
+      color: #1a1a2e;
+    }
+    button.secondary:hover { background: #6ee7df; }
+    button.active {
+      box-shadow: 0 0 15px rgba(233, 69, 96, 0.5);
+    }
+
+    .type-toggle {
+      display: flex;
+      gap: 10px;
+      margin: 15px 0;
+    }
+    .type-toggle button {
+      flex: 1;
+      background: rgba(78, 205, 196, 0.2);
+      color: #4ecdc4;
+      border: 2px solid #4ecdc4;
+    }
+    .type-toggle button.selected {
+      background: #4ecdc4;
+      color: #1a1a2e;
+    }
+    .type-toggle button:hover:not(.selected) {
+      background: rgba(78, 205, 196, 0.3);
+    }
+
+    .keyboard {
+      display: flex;
+      gap: 5px;
+      margin: 15px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .key {
+      background: #4ecdc4;
+      color: #1a1a2e;
+      border: none;
+      padding: 25px 18px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.1s;
+      min-width: 50px;
+    }
+    .key:hover { background: #6ee7df; transform: translateY(-2px); }
+    .key:active { transform: translateY(0); }
+    .key.black { background: #2a2a4e; color: #eee; padding: 20px 12px; }
+    .key.black:hover { background: #3a3a6e; }
+
+    #status {
+      text-align: center;
+      padding: 10px;
+      color: #888;
+      font-size: 14px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+
+    .info-box {
+      background: rgba(78, 205, 196, 0.1);
+      border-left: 4px solid #4ecdc4;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    .info-box.tip {
+      background: rgba(233, 69, 96, 0.1);
+      border-left-color: #e94560;
+    }
+
+    /* Echo visualization */
+    .echo-visual {
+      height: 100px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      margin: 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 0 20px;
+      overflow: hidden;
+      position: relative;
+    }
+    .echo-dot {
+      width: 20px;
+      height: 20px;
+      background: #e94560;
+      border-radius: 50%;
+      position: absolute;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    .echo-dot.ping {
+      background: #e94560;
+    }
+    .echo-dot.pong {
+      background: #4ecdc4;
+    }
+    .echo-label {
+      position: absolute;
+      bottom: 5px;
+      left: 20px;
+      color: #666;
+      font-size: 11px;
+    }
+    .echo-label.right {
+      left: auto;
+      right: 20px;
+    }
+
+    /* Waveform bars for rhythm visualization */
+    .rhythm-visual {
+      height: 80px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      margin: 15px 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 4px;
+      padding: 10px;
+    }
+    .rhythm-bar {
+      width: 8px;
+      background: #e94560;
+      border-radius: 4px 4px 0 0;
+      transition: height 0.1s;
+      height: 10px;
+    }
+    .rhythm-bar.active {
+      background: #4ecdc4;
+    }
+
+    /* Tempo display */
+    .tempo-display {
+      text-align: center;
+      background: rgba(0,0,0,0.2);
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+    .tempo-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #e94560;
+    }
+    .tempo-label {
+      color: #888;
+      font-size: 12px;
+    }
+    .musical-time {
+      color: #4ecdc4;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+
+    .stereo-indicator {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 20px;
+      color: #666;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Delay</h1>
+    <p class="subtitle">Echo and repeat - adding depth and rhythm to your sound</p>
+
+    <div id="status">Click anywhere or press a key to start audio</div>
+
+    <div class="section">
+      <h2>1. Delay Type</h2>
+      <p>Choose between standard feedback delay and stereo ping-pong delay.</p>
+
+      <div class="type-toggle">
+        <button id="typeFeedback" class="selected">FeedbackDelay</button>
+        <button id="typePingPong">PingPongDelay</button>
+      </div>
+
+      <div class="echo-visual" id="echoVisual">
+        <div class="echo-dot" id="echo0"></div>
+        <div class="echo-dot" id="echo1"></div>
+        <div class="echo-dot" id="echo2"></div>
+        <div class="echo-dot" id="echo3"></div>
+        <div class="echo-dot" id="echo4"></div>
+        <span class="echo-label">L</span>
+        <span class="echo-label right">R</span>
+      </div>
+      <div class="stereo-indicator">
+        <span>Left Channel</span>
+        <span>Right Channel</span>
+      </div>
+
+      <div class="info-box">
+        <strong>FeedbackDelay</strong> keeps echoes centered. <strong>PingPongDelay</strong> bounces
+        between left and right speakers for a wide stereo effect. Try both with headphones!
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>2. Delay Parameters</h2>
+      <p>Adjust the delay time, feedback amount, and wet/dry mix.</p>
+
+      <div class="controls">
+        <div class="control">
+          <label>Delay Time <span class="value" id="delayTimeVal">0.25s</span></label>
+          <input type="range" id="delayTime" min="0.05" max="1" step="0.01" value="0.25">
+        </div>
+        <div class="control">
+          <label>Feedback <span class="value" id="feedbackVal">40%</span></label>
+          <input type="range" id="feedback" min="0" max="0.85" step="0.01" value="0.4">
+        </div>
+        <div class="control">
+          <label>Wet Mix <span class="value" id="wetVal">35%</span></label>
+          <input type="range" id="wet" min="0" max="1" step="0.01" value="0.35">
+        </div>
+      </div>
+
+      <div class="info-box tip">
+        <strong>Lofi tip:</strong> Keep feedback between 0.3-0.5 and wet around 0.2-0.4 for subtle depth.
+        Higher values create more dramatic, spacey effects.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>3. Tempo Sync</h2>
+      <p>Sync delay time to musical values for rhythmic echoes.</p>
+
+      <div class="tempo-display">
+        <div class="tempo-value" id="bpmValue">85</div>
+        <div class="tempo-label">BPM</div>
+        <div class="musical-time" id="musicalTime">1/8 note = 176ms</div>
+      </div>
+
+      <div class="controls">
+        <div class="control">
+          <label>Tempo <span class="value" id="tempoVal">85 BPM</span></label>
+          <input type="range" id="tempo" min="60" max="140" step="1" value="85">
+        </div>
+        <div class="control">
+          <label>Musical Subdivision</label>
+          <select id="subdivision">
+            <option value="16n">1/16 note (fast)</option>
+            <option value="8n" selected>1/8 note (classic)</option>
+            <option value="8n.">Dotted 1/8 (bouncy)</option>
+            <option value="4n">1/4 note (spacious)</option>
+            <option value="4n.">Dotted 1/4</option>
+            <option value="2n">1/2 note (ambient)</option>
+            <option value="manual">Manual (use slider)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="rhythm-visual" id="rhythmVisual">
+        <!-- Bars will be created by JS -->
+      </div>
+
+      <button id="toggleSync" class="secondary">Enable Tempo Sync</button>
+
+      <div class="info-box">
+        <strong>Dotted eighth notes</strong> (1/8.) create that classic dub/ambient bounce pattern -
+        the echo fills in between the beats in a syncopated way.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>4. Play Notes</h2>
+      <p>Play notes to hear the delay effect. Use keyboard keys A-K or click.</p>
+
+      <div class="keyboard" id="keyboard">
+        <button class="key" data-note="C4">C</button>
+        <button class="key black" data-note="C#4">C#</button>
+        <button class="key" data-note="D4">D</button>
+        <button class="key black" data-note="D#4">D#</button>
+        <button class="key" data-note="E4">E</button>
+        <button class="key" data-note="F4">F</button>
+        <button class="key black" data-note="F#4">F#</button>
+        <button class="key" data-note="G4">G</button>
+        <button class="key black" data-note="G#4">G#</button>
+        <button class="key" data-note="A4">A</button>
+        <button class="key black" data-note="A#4">A#</button>
+        <button class="key" data-note="B4">B</button>
+        <button class="key" data-note="C5">C</button>
+      </div>
+
+      <div style="text-align: center; margin-top: 15px;">
+        <button id="playChord">Play Chord (Dm7)</button>
+        <button id="playArpeggio">Play Arpeggio</button>
+        <button id="playRhythm" class="secondary">Start Rhythm</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>5. Presets</h2>
+      <p>Quick settings for common delay sounds.</p>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button class="secondary" data-preset="subtle">Subtle Depth</button>
+        <button class="secondary" data-preset="tape">Tape Echo</button>
+        <button class="secondary" data-preset="dub">Dub Delay</button>
+        <button class="secondary" data-preset="ambient">Ambient Wash</button>
+        <button class="secondary" data-preset="slapback">Slapback</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global state
+    let synth = null;
+    let feedbackDelay = null;
+    let pingPongDelay = null;
+    let currentDelay = null;
+    let delayType = 'feedback';
+    let tempoSynced = false;
+    let rhythmLoop = null;
+    let isPlaying = false;
+
+    // Presets
+    const presets = {
+      subtle: { delayTime: 0.12, feedback: 0.2, wet: 0.15, desc: 'Subtle room-like depth' },
+      tape: { delayTime: '8n', feedback: 0.5, wet: 0.35, desc: 'Vintage tape echo feel' },
+      dub: { delayTime: '8n.', feedback: 0.6, wet: 0.45, desc: 'Classic dub reggae delay' },
+      ambient: { delayTime: 0.8, feedback: 0.7, wet: 0.5, desc: 'Spacey ambient wash' },
+      slapback: { delayTime: 0.08, feedback: 0.1, wet: 0.4, desc: 'Quick rockabilly slap' }
+    };
+
+    // Initialize audio
+    async function initAudio() {
+      await Tone.start();
+
+      // Create synth
+      synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: {
+          attack: 0.02,
+          decay: 0.3,
+          sustain: 0.3,
+          release: 0.8
+        }
+      });
+      synth.volume.value = -6;
+
+      // Create both delay types
+      feedbackDelay = new Tone.FeedbackDelay({
+        delayTime: 0.25,
+        feedback: 0.4,
+        wet: 0.35,
+        maxDelay: 2
+      }).toDestination();
+
+      pingPongDelay = new Tone.PingPongDelay({
+        delayTime: 0.25,
+        feedback: 0.4,
+        wet: 0.35,
+        maxDelay: 2
+      }).toDestination();
+
+      // Start with feedback delay
+      currentDelay = feedbackDelay;
+      synth.connect(currentDelay);
+
+      // Set initial tempo
+      Tone.Transport.bpm.value = 85;
+
+      updateStatus('Ready! Click keys or use keyboard (A-K) to play.');
+      createRhythmBars();
+    }
+
+    function updateStatus(msg) {
+      document.getElementById('status').textContent = msg;
+    }
+
+    // Switch delay type
+    function setDelayType(type) {
+      delayType = type;
+      synth.disconnect();
+
+      // Copy settings to new delay
+      const settings = {
+        delayTime: currentDelay.delayTime.value,
+        feedback: currentDelay.feedback.value,
+        wet: currentDelay.wet.value
+      };
+
+      if (type === 'feedback') {
+        feedbackDelay.delayTime.value = settings.delayTime;
+        feedbackDelay.feedback.value = settings.feedback;
+        feedbackDelay.wet.value = settings.wet;
+        currentDelay = feedbackDelay;
+      } else {
+        pingPongDelay.delayTime.value = settings.delayTime;
+        pingPongDelay.feedback.value = settings.feedback;
+        pingPongDelay.wet.value = settings.wet;
+        currentDelay = pingPongDelay;
+      }
+
+      synth.connect(currentDelay);
+
+      // Update UI
+      document.getElementById('typeFeedback').classList.toggle('selected', type === 'feedback');
+      document.getElementById('typePingPong').classList.toggle('selected', type === 'pingpong');
+    }
+
+    // Play a note
+    async function playNote(note) {
+      if (!synth) await initAudio();
+      synth.triggerAttackRelease(note, '8n');
+      triggerEchoVisual();
+    }
+
+    // Echo visualization
+    function triggerEchoVisual() {
+      const dots = document.querySelectorAll('.echo-dot');
+      const delayTime = currentDelay.delayTime.value;
+      const feedback = currentDelay.feedback.value;
+      const isPingPong = delayType === 'pingpong';
+
+      dots.forEach((dot, i) => {
+        setTimeout(() => {
+          // Calculate position based on delay type
+          const progress = i / (dots.length - 1);
+          const opacity = Math.pow(feedback, i) * 0.9 + 0.1;
+
+          if (isPingPong) {
+            // Alternate left/right
+            const isLeft = i % 2 === 0;
+            dot.style.left = isLeft ? `${20 + progress * 30}%` : 'auto';
+            dot.style.right = isLeft ? 'auto' : `${20 + (1 - progress) * 30}%`;
+            dot.classList.toggle('ping', isLeft);
+            dot.classList.toggle('pong', !isLeft);
+          } else {
+            // Center
+            dot.style.left = `${20 + progress * 60}%`;
+            dot.style.right = 'auto';
+            dot.classList.add('ping');
+            dot.classList.remove('pong');
+          }
+
+          dot.style.opacity = opacity;
+          dot.style.transform = `scale(${1 - i * 0.15})`;
+
+          // Fade out
+          setTimeout(() => {
+            dot.style.opacity = 0;
+          }, 200);
+        }, i * delayTime * 1000);
+      });
+    }
+
+    // Calculate musical time in ms
+    function getMusicalTimeMs(subdivision, bpm) {
+      const beatMs = 60000 / bpm;
+      const values = {
+        '16n': beatMs / 4,
+        '8n': beatMs / 2,
+        '8n.': beatMs * 0.75,
+        '4n': beatMs,
+        '4n.': beatMs * 1.5,
+        '2n': beatMs * 2
+      };
+      return values[subdivision] || beatMs / 2;
+    }
+
+    // Update musical time display
+    function updateMusicalTimeDisplay() {
+      const bpm = Tone.Transport.bpm.value;
+      const subdivision = document.getElementById('subdivision').value;
+
+      if (subdivision === 'manual') {
+        document.getElementById('musicalTime').textContent = 'Manual mode';
+        return;
+      }
+
+      const ms = Math.round(getMusicalTimeMs(subdivision, bpm));
+      const names = {
+        '16n': '1/16 note',
+        '8n': '1/8 note',
+        '8n.': 'Dotted 1/8',
+        '4n': '1/4 note',
+        '4n.': 'Dotted 1/4',
+        '2n': '1/2 note'
+      };
+      document.getElementById('musicalTime').textContent = `${names[subdivision]} = ${ms}ms`;
+    }
+
+    // Create rhythm visualization bars
+    function createRhythmBars() {
+      const container = document.getElementById('rhythmVisual');
+      container.innerHTML = '';
+      for (let i = 0; i < 16; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'rhythm-bar';
+        container.appendChild(bar);
+      }
+    }
+
+    // Animate rhythm bars
+    function animateRhythmBars() {
+      const bars = document.querySelectorAll('.rhythm-bar');
+      let beat = 0;
+
+      if (rhythmLoop) rhythmLoop.dispose();
+
+      rhythmLoop = new Tone.Loop((time) => {
+        Tone.Draw.schedule(() => {
+          bars.forEach((bar, i) => {
+            bar.classList.remove('active');
+            bar.style.height = '10px';
+          });
+          bars[beat].classList.add('active');
+          bars[beat].style.height = '60px';
+
+          // Show echo bars
+          const delayTime = currentDelay.delayTime.value;
+          const feedback = currentDelay.feedback.value;
+          const sixteenthMs = 60000 / Tone.Transport.bpm.value / 4;
+
+          for (let echo = 1; echo <= 3; echo++) {
+            const echoDelay = delayTime * 1000 * echo;
+            const echoBar = Math.round(beat + echoDelay / sixteenthMs) % 16;
+            const echoHeight = 60 * Math.pow(feedback, echo);
+
+            setTimeout(() => {
+              if (bars[echoBar]) {
+                bars[echoBar].style.height = `${Math.max(10, echoHeight)}px`;
+                bars[echoBar].style.background = `rgba(78, 205, 196, ${Math.pow(feedback, echo)})`;
+              }
+            }, echoDelay);
+          }
+
+          beat = (beat + 1) % 16;
+        }, time);
+      }, '16n').start(0);
+    }
+
+    // Setup event listeners
+    function setupEventListeners() {
+      // Delay type toggle
+      document.getElementById('typeFeedback').addEventListener('click', () => setDelayType('feedback'));
+      document.getElementById('typePingPong').addEventListener('click', () => setDelayType('pingpong'));
+
+      // Parameter controls
+      document.getElementById('delayTime').addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        document.getElementById('delayTimeVal').textContent = val.toFixed(2) + 's';
+        if (!tempoSynced && currentDelay) {
+          currentDelay.delayTime.value = val;
+        }
+      });
+
+      document.getElementById('feedback').addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        document.getElementById('feedbackVal').textContent = Math.round(val * 100) + '%';
+        if (currentDelay) currentDelay.feedback.value = val;
+      });
+
+      document.getElementById('wet').addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        document.getElementById('wetVal').textContent = Math.round(val * 100) + '%';
+        if (currentDelay) currentDelay.wet.value = val;
+      });
+
+      // Tempo controls
+      document.getElementById('tempo').addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        document.getElementById('tempoVal').textContent = val + ' BPM';
+        document.getElementById('bpmValue').textContent = val;
+        Tone.Transport.bpm.value = val;
+
+        if (tempoSynced) {
+          updateDelayFromTempo();
+        }
+        updateMusicalTimeDisplay();
+      });
+
+      document.getElementById('subdivision').addEventListener('change', (e) => {
+        if (tempoSynced && e.target.value !== 'manual') {
+          updateDelayFromTempo();
+        }
+        updateMusicalTimeDisplay();
+      });
+
+      document.getElementById('toggleSync').addEventListener('click', function() {
+        tempoSynced = !tempoSynced;
+        this.textContent = tempoSynced ? 'Disable Tempo Sync' : 'Enable Tempo Sync';
+        this.classList.toggle('active', tempoSynced);
+
+        if (tempoSynced) {
+          updateDelayFromTempo();
+        }
+
+        // Enable/disable manual slider
+        document.getElementById('delayTime').disabled = tempoSynced && document.getElementById('subdivision').value !== 'manual';
+      });
+
+      // Keyboard
+      document.querySelectorAll('.key').forEach(key => {
+        key.addEventListener('click', () => playNote(key.dataset.note));
+      });
+
+      // Chord and arpeggio buttons
+      document.getElementById('playChord').addEventListener('click', async () => {
+        if (!synth) await initAudio();
+        synth.triggerAttackRelease(['D3', 'F3', 'A3', 'C4'], '2n');
+        triggerEchoVisual();
+      });
+
+      document.getElementById('playArpeggio').addEventListener('click', async () => {
+        if (!synth) await initAudio();
+        const notes = ['D3', 'F3', 'A3', 'C4', 'A3', 'F3'];
+        notes.forEach((note, i) => {
+          setTimeout(() => {
+            synth.triggerAttackRelease(note, '8n');
+            triggerEchoVisual();
+          }, i * 150);
+        });
+      });
+
+      document.getElementById('playRhythm').addEventListener('click', async function() {
+        if (!synth) await initAudio();
+
+        isPlaying = !isPlaying;
+        this.textContent = isPlaying ? 'Stop Rhythm' : 'Start Rhythm';
+        this.classList.toggle('active', isPlaying);
+
+        if (isPlaying) {
+          // Simple rhythm pattern
+          const pattern = new Tone.Sequence((time, note) => {
+            if (note) {
+              synth.triggerAttackRelease(note, '16n', time);
+            }
+          }, ['D4', null, null, 'A3', null, 'D4', null, null], '8n').start(0);
+
+          animateRhythmBars();
+          Tone.Transport.start();
+        } else {
+          Tone.Transport.stop();
+          if (rhythmLoop) {
+            rhythmLoop.dispose();
+            rhythmLoop = null;
+          }
+          // Reset bars
+          document.querySelectorAll('.rhythm-bar').forEach(bar => {
+            bar.classList.remove('active');
+            bar.style.height = '10px';
+            bar.style.background = '#e94560';
+          });
+        }
+      });
+
+      // Presets
+      document.querySelectorAll('[data-preset]').forEach(btn => {
+        btn.addEventListener('click', async function() {
+          if (!synth) await initAudio();
+
+          const preset = presets[this.dataset.preset];
+
+          // Handle tempo-synced presets
+          if (typeof preset.delayTime === 'string') {
+            tempoSynced = true;
+            document.getElementById('toggleSync').textContent = 'Disable Tempo Sync';
+            document.getElementById('toggleSync').classList.add('active');
+            document.getElementById('subdivision').value = preset.delayTime;
+            updateDelayFromTempo();
+          } else {
+            tempoSynced = false;
+            document.getElementById('toggleSync').textContent = 'Enable Tempo Sync';
+            document.getElementById('toggleSync').classList.remove('active');
+            document.getElementById('subdivision').value = 'manual';
+            currentDelay.delayTime.value = preset.delayTime;
+            document.getElementById('delayTime').value = preset.delayTime;
+            document.getElementById('delayTimeVal').textContent = preset.delayTime.toFixed(2) + 's';
+          }
+
+          currentDelay.feedback.value = preset.feedback;
+          currentDelay.wet.value = preset.wet;
+
+          document.getElementById('feedback').value = preset.feedback;
+          document.getElementById('feedbackVal').textContent = Math.round(preset.feedback * 100) + '%';
+          document.getElementById('wet').value = preset.wet;
+          document.getElementById('wetVal').textContent = Math.round(preset.wet * 100) + '%';
+          document.getElementById('delayTime').disabled = tempoSynced;
+
+          updateMusicalTimeDisplay();
+          updateStatus(`Preset: ${preset.desc}`);
+        });
+      });
+
+      // Computer keyboard input
+      const keyMap = {
+        'a': 'C4', 'w': 'C#4', 's': 'D4', 'e': 'D#4', 'd': 'E4',
+        'f': 'F4', 't': 'F#4', 'g': 'G4', 'y': 'G#4', 'h': 'A4',
+        'u': 'A#4', 'j': 'B4', 'k': 'C5'
+      };
+
+      document.addEventListener('keydown', (e) => {
+        const note = keyMap[e.key.toLowerCase()];
+        if (note) {
+          playNote(note);
+          // Highlight key
+          const keyBtn = document.querySelector(`.key[data-note="${note}"]`);
+          if (keyBtn) {
+            keyBtn.style.transform = 'translateY(2px)';
+            setTimeout(() => keyBtn.style.transform = '', 100);
+          }
+        }
+      });
+
+      // Init on first click
+      document.addEventListener('click', async () => {
+        if (!synth) await initAudio();
+      }, { once: true });
+    }
+
+    // Update delay time from tempo
+    function updateDelayFromTempo() {
+      const subdivision = document.getElementById('subdivision').value;
+      if (subdivision === 'manual') return;
+
+      const bpm = Tone.Transport.bpm.value;
+      const ms = getMusicalTimeMs(subdivision, bpm);
+      const seconds = ms / 1000;
+
+      if (currentDelay) {
+        currentDelay.delayTime.value = seconds;
+      }
+
+      document.getElementById('delayTime').value = Math.min(seconds, 1);
+      document.getElementById('delayTimeVal').textContent = seconds.toFixed(2) + 's';
+      updateMusicalTimeDisplay();
+    }
+
+    // Initialize
+    setupEventListeners();
+    updateMusicalTimeDisplay();
+  </script>
+</body>
+</html>

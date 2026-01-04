@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sunrise Hustle - Cosmic Lofi Experience</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/tone@14"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #100805;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    #canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
+    /* Floating Controls Panel */
+    .controls {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+      background: rgba(16, 8, 5, 0.85);
+      border: 1px solid rgba(255, 138, 64, 0.2);
+      border-radius: 12px;
+      padding: 20px;
+      min-width: 200px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .title {
+      color: #ff8a40;
+      font-size: 18px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      margin-bottom: 15px;
+      text-shadow: 0 0 20px rgba(255, 138, 64, 0.4);
+    }
+
+    .subtitle {
+      color: #555;
+      font-size: 11px;
+      margin-bottom: 15px;
+      font-style: italic;
+    }
+
+    .play-btn {
+      width: 100%;
+      padding: 14px 20px;
+      font-size: 14px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+      background: linear-gradient(135deg, #ff8a40 0%, #cc6020 100%);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(255, 138, 64, 0.3);
+    }
+
+    .play-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(255, 138, 64, 0.5);
+    }
+
+    .play-btn.playing {
+      background: linear-gradient(135deg, #ffb060 0%, #cc8040 100%);
+      box-shadow: 0 4px 20px rgba(255, 176, 96, 0.4);
+    }
+
+    .control-row {
+      margin-top: 15px;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      color: #555;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .control-value {
+      color: #ff8a40;
+      font-weight: bold;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255, 138, 64, 0.1);
+      border-radius: 3px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #ff8a40;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(255, 138, 64, 0.5);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: #ff8a40;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 10px rgba(255, 138, 64, 0.5);
+    }
+
+    /* Section Indicator */
+    .section-indicator {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .current-section {
+      font-size: 22px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      text-align: center;
+      color: #ff8a40;
+      text-shadow: 0 0 30px currentColor;
+      transition: color 0.3s;
+    }
+
+    .section-time {
+      text-align: center;
+      color: #555;
+      font-size: 11px;
+      margin-top: 8px;
+    }
+
+    /* Timeline at bottom */
+    .timeline {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 50px;
+      z-index: 100;
+      background: linear-gradient(to top, rgba(16, 8, 5, 0.9), transparent);
+      display: flex;
+      align-items: flex-end;
+      padding: 10px 20px;
+    }
+
+    .timeline-track {
+      flex: 1;
+      height: 30px;
+      display: flex;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .timeline-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: filter 0.2s, transform 0.1s;
+      color: rgba(255, 255, 255, 0.8);
+      border-right: 1px solid rgba(0, 0, 0, 0.3);
+    }
+
+    .timeline-section:last-child { border-right: none; }
+    .timeline-section:hover { filter: brightness(1.3); }
+    .timeline-section.active { filter: brightness(1.5); transform: scaleY(1.05); }
+
+    .timeline-section.dawn { background: linear-gradient(180deg, #ff6030, #cc4020); }
+    .timeline-section.wakeup { background: linear-gradient(180deg, #ff8040, #cc5530); }
+    .timeline-section.groove { background: linear-gradient(180deg, #ffa050, #cc7040); }
+    .timeline-section.breathe { background: linear-gradient(180deg, #ff7030, #cc5020); }
+    .timeline-section.hustle { background: linear-gradient(180deg, #ffb060, #cc8040); }
+    .timeline-section.sunset { background: linear-gradient(180deg, #ff5020, #cc3010); }
+
+    .playhead {
+      position: absolute;
+      width: 3px;
+      height: 100%;
+      background: #fff;
+      box-shadow: 0 0 12px #fff;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 10;
+      border-radius: 2px;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 600px) {
+      .controls {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        min-width: auto;
+        padding: 15px;
+      }
+
+      .title { font-size: 14px; }
+      .play-btn { padding: 12px 16px; font-size: 12px; }
+      .timeline-section { font-size: 7px; }
+    }
+
+    .hint {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #333;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      z-index: 50;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div class="controls">
+    <div class="title">Sunrise Hustle</div>
+    <div class="subtitle">// upbeat lofi experience</div>
+
+    <button id="playBtn" class="play-btn">Rise</button>
+
+    <div class="control-row">
+      <div class="control-label">
+        <span>Volume</span>
+        <span class="control-value" id="volVal">-12 dB</span>
+      </div>
+      <input type="range" id="volumeSlider" min="-30" max="0" value="-12">
+    </div>
+
+    <div class="section-indicator">
+      <div class="current-section" id="currentSection">Ready</div>
+      <div class="section-time" id="sectionTime">0:00 / 3:16</div>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-track" id="timeline">
+      <div class="playhead" id="playhead"></div>
+    </div>
+  </div>
+
+  <div class="hint">Click timeline to jump</div>
+
+  <script type="module">
+    // ============================================================================
+    // IMPORTS - New Modular Architecture
+    // ============================================================================
+
+    import { Conductor } from '../lib/conductor.js';
+    import { SunriseHustle } from '../sounds/sunrise-hustle.js';
+    import { CosmicVisuals } from '../visuals/cosmic/index.js';
+
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+
+    const canvas = document.getElementById('canvas');
+
+    let isPlaying = false;
+    let currentSectionIndex = 0;
+
+    // Conductor connects sound to visuals
+    let conductor = null;
+    let sound = null;
+    let visuals = null;
+
+    // Song structure (72 bars @ 88 BPM = ~3:16)
+    const songStructure = [
+      { name: 'dawn', startBar: 0, bars: 8, label: 'Dawn', color: '#ff6030' },
+      { name: 'wakeup', startBar: 8, bars: 16, label: 'Wake Up', color: '#ff8040' },
+      { name: 'groove', startBar: 24, bars: 16, label: 'Groove', color: '#ffa050' },
+      { name: 'breathe', startBar: 40, bars: 8, label: 'Breathe', color: '#ff7030' },
+      { name: 'hustle', startBar: 48, bars: 16, label: 'Hustle', color: '#ffb060' },
+      { name: 'sunset', startBar: 64, bars: 8, label: 'Sunset', color: '#ff5020' }
+    ];
+    const totalBars = 72;
+    const BPM = 88;
+
+    // ============================================================================
+    // INITIALIZE COMPONENTS
+    // ============================================================================
+
+    // Initialize visuals with sunrise preset
+    visuals = new CosmicVisuals(canvas, {
+      preset: 'sunrise',
+      baseHue: 30,
+      nebulaCount: 25,
+      maxShootingStars: 3
+    });
+
+    // Initialize conductor
+    conductor = new Conductor(canvas);
+    conductor.setVisual(visuals);
+
+    // Build initial timeline
+    buildTimeline();
+
+    // ============================================================================
+    // AUDIO INITIALIZATION
+    // ============================================================================
+
+    async function initAudio() {
+      // Create sound engine
+      sound = new SunriseHustle();
+
+      // Wire up conductor
+      conductor.setSound(sound);
+
+      // Set initial volume to match slider default (-12 dB)
+      Tone.Destination.volume.value = -12;
+    }
+
+    // ============================================================================
+    // TIMELINE
+    // ============================================================================
+
+    function buildTimeline() {
+      const timeline = document.getElementById('timeline');
+      timeline.innerHTML = '<div class="playhead" id="playhead"></div>';
+
+      songStructure.forEach((section, index) => {
+        const div = document.createElement('div');
+        div.className = `timeline-section ${section.name}`;
+        div.style.width = `${(section.bars / totalBars) * 100}%`;
+        div.textContent = section.label;
+        div.addEventListener('click', () => jumpToSection(index));
+        timeline.appendChild(div);
+      });
+    }
+
+    function jumpToSection(index) {
+      if (!sound || !sound.isInitialized) return;
+
+      const section = songStructure[index];
+      currentSectionIndex = index;
+      sound.jumpToBar(section.startBar);
+      updateSectionDisplay(section, index);
+
+      if (!isPlaying) startPlayback();
+    }
+
+    function updateSectionDisplay(section, index) {
+      const el = document.getElementById('currentSection');
+      el.textContent = section.label;
+      el.style.color = section.color;
+
+      document.querySelectorAll('.timeline-section').forEach((s, i) => {
+        s.classList.toggle('active', i === index);
+      });
+    }
+
+    // ============================================================================
+    // PLAYBACK
+    // ============================================================================
+
+    async function startPlayback() {
+      if (!sound) await initAudio();
+      if (isPlaying) return;
+
+      // Start conductor (which starts sound)
+      await conductor.start();
+      isPlaying = true;
+
+      document.getElementById('playBtn').textContent = 'Stop';
+      document.getElementById('playBtn').classList.add('playing');
+
+      // Start section tracking
+      updateSectionDisplay(songStructure[0], 0);
+    }
+
+    function stopPlayback() {
+      if (!sound) return;
+
+      conductor.stop();
+      isPlaying = false;
+      currentSectionIndex = 0;
+
+      document.getElementById('playBtn').textContent = 'Rise';
+      document.getElementById('playBtn').classList.remove('playing');
+      document.getElementById('currentSection').textContent = 'Ready';
+      document.getElementById('currentSection').style.color = '#ff8a40';
+      document.getElementById('playhead').style.left = '0%';
+    }
+
+    // ============================================================================
+    // RENDER LOOP
+    // ============================================================================
+
+    function render() {
+      // Update progress display
+      if (isPlaying && sound) {
+        updateProgress();
+        updateCurrentSection();
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    function updateProgress() {
+      const position = Tone.Transport.position;
+      const parts = position.split(':');
+      const bar = parseInt(parts[0]);
+      const beat = parseInt(parts[1]);
+      const progressBars = bar + beat / 4;
+      const percent = (progressBars / totalBars) * 100;
+
+      document.getElementById('playhead').style.left = `${Math.min(percent, 100)}%`;
+
+      const secondsPerBar = (60 / BPM) * 4;
+      const currentSeconds = progressBars * secondsPerBar;
+      const totalSeconds = totalBars * secondsPerBar;
+
+      const formatTime = (s) => {
+        const m = Math.floor(s / 60);
+        const sec = Math.floor(s % 60).toString().padStart(2, '0');
+        return `${m}:${sec}`;
+      };
+
+      document.getElementById('sectionTime').textContent =
+        `${formatTime(currentSeconds)} / ${formatTime(totalSeconds)}`;
+    }
+
+    function updateCurrentSection() {
+      const position = Tone.Transport.position;
+      const bar = parseInt(position.split(':')[0]);
+
+      // Find current section
+      for (let i = songStructure.length - 1; i >= 0; i--) {
+        if (bar >= songStructure[i].startBar) {
+          if (i !== currentSectionIndex) {
+            currentSectionIndex = i;
+            updateSectionDisplay(songStructure[i], i);
+          }
+          break;
+        }
+      }
+    }
+
+    // ============================================================================
+    // EVENT LISTENERS
+    // ============================================================================
+
+    document.getElementById('playBtn').addEventListener('click', async () => {
+      if (isPlaying) {
+        stopPlayback();
+      } else {
+        await startPlayback();
+      }
+    });
+
+    document.getElementById('volumeSlider').addEventListener('input', (e) => {
+      const vol = parseFloat(e.target.value);
+      Tone.Destination.volume.value = vol;
+      document.getElementById('volVal').textContent = `${vol} dB`;
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', async (e) => {
+      if (e.key === ' ') {
+        e.preventDefault();
+        if (isPlaying) {
+          stopPlayback();
+        } else {
+          await startPlayback();
+        }
+      }
+
+      const num = parseInt(e.key);
+      if (num >= 1 && num <= 6 && sound && sound.isInitialized) {
+        jumpToSection(num - 1);
+      }
+    });
+
+    // Touch support
+    canvas.addEventListener('touchstart', async (e) => {
+      if (!isPlaying) {
+        e.preventDefault();
+        await startPlayback();
+      }
+    }, { passive: false });
+
+    // Cleanup
+    window.addEventListener('beforeunload', () => {
+      if (conductor) conductor.dispose();
+    });
+
+    // Start render loop
+    render();
+  </script>
+</body>
+</html>
