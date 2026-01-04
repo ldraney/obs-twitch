@@ -259,9 +259,9 @@
     <div class="control-row">
       <div class="control-label">
         <span>Volume</span>
-        <span class="control-value" id="volVal">-6 dB</span>
+        <span class="control-value" id="volVal">-12 dB</span>
       </div>
-      <input type="range" id="volumeSlider" min="-30" max="0" value="-6">
+      <input type="range" id="volumeSlider" min="-30" max="0" value="-12">
     </div>
 
     <div class="control-row">
@@ -589,6 +589,9 @@
       createPatterns();
       scheduleStructure();
       buildTimeline();
+
+      // Set initial volume to match slider default (80% loudness)
+      Tone.Destination.volume.value = -12;
 
       isInitialized = true;
     }
