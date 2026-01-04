@@ -10,7 +10,7 @@
  * - Background gradient with color shifting
  */
 
-import { lerp } from './utils.js';
+import { lerp } from '../../lib/utils.js';
 
 /**
  * Default configuration for cosmic visuals
