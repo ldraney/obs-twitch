@@ -45,6 +45,48 @@ let chatSocket = null; // Main account - for reading chat
 let botSocket = null;  // Bot account - for sending messages
 let botConnected = false;
 
+// Reconnection state with exponential backoff
+const reconnectState = {
+  twitch: { attempts: 0, timeout: null },
+  chat: { attempts: 0, timeout: null },
+  bot: { attempts: 0, timeout: null },
+};
+
+const MAX_RECONNECT_DELAY = 60000; // 1 minute max
+const BASE_RECONNECT_DELAY = 1000; // 1 second base
+
+function getReconnectDelay(attempts) {
+  // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s, 60s (capped)
+  const delay = Math.min(BASE_RECONNECT_DELAY * Math.pow(2, attempts), MAX_RECONNECT_DELAY);
+  // Add jitter (0-25% of delay) to prevent thundering herd
+  return delay + Math.random() * delay * 0.25;
+}
+
+function scheduleReconnect(name, connectFn) {
+  const state = reconnectState[name];
+  if (state.timeout) {
+    clearTimeout(state.timeout);
+  }
+
+  const delay = getReconnectDelay(state.attempts);
+  state.attempts++;
+
+  console.log(`🔄 ${name}: reconnecting in ${Math.round(delay / 1000)}s (attempt ${state.attempts})`);
+
+  state.timeout = setTimeout(() => {
+    connectFn();
+  }, delay);
+}
+
+function resetReconnectState(name) {
+  const state = reconnectState[name];
+  state.attempts = 0;
+  if (state.timeout) {
+    clearTimeout(state.timeout);
+    state.timeout = null;
+  }
+}
+
 // ============================================
 // TWITCH API HELPERS
 // ============================================
@@ -126,47 +168,65 @@ async function subscribeToAllEvents(sessionId) {
 
 function connectToTwitch() {
   console.log('🔌 Connecting to Twitch EventSub...');
-  const ws = new WebSocket(TWITCH_EVENTSUB_URL);
+  let ws;
+  try {
+    ws = new WebSocket(TWITCH_EVENTSUB_URL);
+  } catch (err) {
+    console.error('❌ Failed to create Twitch WebSocket:', err.message);
+    scheduleReconnect('twitch', connectToTwitch);
+    return;
+  }
 
-  ws.on('open', () => console.log('✅ Connected to Twitch'));
+  ws.on('open', () => {
+    console.log('✅ Connected to Twitch');
+    resetReconnectState('twitch');
+  });
 
   ws.on('message', async (data) => {
-    const message = JSON.parse(data.toString());
-    const messageType = message.metadata?.message_type;
+    try {
+      const message = JSON.parse(data.toString());
+      const messageType = message.metadata?.message_type;
 
-    switch (messageType) {
-      case 'session_welcome':
-        const sessionId = message.payload.session.id;
-        console.log(`📨 Session: ${sessionId.substring(0, 20)}...`);
-        await subscribeToAllEvents(sessionId);
-        break;
+      switch (messageType) {
+        case 'session_welcome':
+          const sessionId = message.payload.session.id;
+          console.log(`📨 Session: ${sessionId.substring(0, 20)}...`);
+          await subscribeToAllEvents(sessionId);
+          break;
 
-      case 'session_keepalive':
-        break; // Silent keepalive
+        case 'session_keepalive':
+          break; // Silent keepalive
 
-      case 'notification':
-        handleTwitchEvent(message.payload);
-        break;
+        case 'notification':
+          handleTwitchEvent(message.payload);
+          break;
 
-      case 'session_reconnect':
-        console.log('🔄 Reconnecting to new Twitch endpoint...');
-        ws.close();
-        setTimeout(connectToTwitch, 1000);
-        break;
+        case 'session_reconnect':
+          console.log('🔄 Twitch requested reconnect to new endpoint...');
+          ws.close();
+          // Immediate reconnect for server-requested reconnect
+          setTimeout(connectToTwitch, 1000);
+          break;
 
-      case 'revocation':
-        console.log('⚠️ Subscription revoked:', message.payload.subscription.type);
-        break;
+        case 'revocation':
+          console.log('⚠️ Subscription revoked:', message.payload.subscription.type);
+          break;
+      }
+    } catch (err) {
+      console.error('❌ Error processing Twitch message:', err.message);
     }
   });
 
-  ws.on('close', () => {
-    console.log('❌ Twitch disconnected, reconnecting in 5s...');
+  ws.on('close', (code, reason) => {
+    console.log(`❌ Twitch disconnected (code: ${code})`);
     twitchConnected = false;
-    setTimeout(connectToTwitch, 5000);
+    scheduleReconnect('twitch', connectToTwitch);
   });
 
-  ws.on('error', (err) => console.error('Twitch error:', err.message));
+  ws.on('error', (err) => {
+    console.error('Twitch error:', err.message);
+    // Note: 'close' event will fire after 'error', which triggers reconnect
+  });
 }
 
 function handleTwitchEvent(payload) {
@@ -222,11 +282,19 @@ function handleTwitchEvent(payload) {
 
 function connectToChat() {
   console.log('💬 Connecting to Twitch Chat...');
-  const ws = new WebSocket(TWITCH_IRC_URL);
+  let ws;
+  try {
+    ws = new WebSocket(TWITCH_IRC_URL);
+  } catch (err) {
+    console.error('❌ Failed to create Chat WebSocket:', err.message);
+    scheduleReconnect('chat', connectToChat);
+    return;
+  }
   chatSocket = ws; // Store for sending messages
 
   ws.on('open', () => {
     console.log('✅ Connected to Twitch IRC');
+    resetReconnectState('chat');
 
     // Authenticate
     ws.send(`PASS oauth:${ACCESS_TOKEN}`);
@@ -242,28 +310,33 @@ function connectToChat() {
   });
 
   ws.on('message', (data) => {
-    const message = data.toString();
+    try {
+      const message = data.toString();
 
-    // Handle PING to stay connected
-    if (message.startsWith('PING')) {
-      ws.send('PONG :tmi.twitch.tv');
-      return;
-    }
-
-    // Parse PRIVMSG (chat messages)
-    if (message.includes('PRIVMSG')) {
-      const chatEvent = parseIRCMessage(message);
-      if (chatEvent) {
-        console.log(`💬 ${chatEvent.username}: ${chatEvent.message}`);
-        broadcastToOverlays(chatEvent);
+      // Handle PING to stay connected
+      if (message.startsWith('PING')) {
+        ws.send('PONG :tmi.twitch.tv');
+        return;
       }
+
+      // Parse PRIVMSG (chat messages)
+      if (message.includes('PRIVMSG')) {
+        const chatEvent = parseIRCMessage(message);
+        if (chatEvent) {
+          console.log(`💬 ${chatEvent.username}: ${chatEvent.message}`);
+          broadcastToOverlays(chatEvent);
+        }
+      }
+    } catch (err) {
+      console.error('❌ Error processing chat message:', err.message);
     }
   });
 
-  ws.on('close', () => {
-    console.log('❌ Chat disconnected, reconnecting in 5s...');
+  ws.on('close', (code) => {
+    console.log(`❌ Chat disconnected (code: ${code})`);
     chatConnected = false;
-    setTimeout(connectToChat, 5000);
+    chatSocket = null;
+    scheduleReconnect('chat', connectToChat);
   });
 
   ws.on('error', (err) => console.error('Chat error:', err.message));
@@ -276,7 +349,14 @@ function connectBot() {
   }
 
   console.log(`🤖 Connecting bot (${BOT_USERNAME})...`);
-  const ws = new WebSocket(TWITCH_IRC_URL);
+  let ws;
+  try {
+    ws = new WebSocket(TWITCH_IRC_URL);
+  } catch (err) {
+    console.error('❌ Failed to create Bot WebSocket:', err.message);
+    scheduleReconnect('bot', connectBot);
+    return;
+  }
   botSocket = ws;
 
   ws.on('open', () => {
@@ -288,20 +368,31 @@ function connectBot() {
     ws.send(`JOIN #${USERNAME.toLowerCase()}`);
 
     botConnected = true;
+    resetReconnectState('bot');
     console.log(`✅ Bot connected as ${BOT_USERNAME}`);
   });
 
   ws.on('message', (data) => {
-    const message = data.toString();
-    if (message.startsWith('PING')) {
-      ws.send('PONG :tmi.twitch.tv');
+    try {
+      const message = data.toString();
+      if (message.startsWith('PING')) {
+        ws.send('PONG :tmi.twitch.tv');
+      }
+      // Check for authentication failure
+      if (message.includes('Login authentication failed')) {
+        console.error('❌ Bot auth failed - token may be expired');
+        console.log('   Run: cd ~/twitch-client && node auth.js refresh');
+      }
+    } catch (err) {
+      console.error('❌ Error processing bot message:', err.message);
     }
   });
 
-  ws.on('close', () => {
-    console.log('❌ Bot disconnected, reconnecting in 5s...');
+  ws.on('close', (code) => {
+    console.log(`❌ Bot disconnected (code: ${code})`);
     botConnected = false;
-    setTimeout(connectBot, 5000);
+    botSocket = null;
+    scheduleReconnect('bot', connectBot);
   });
 
   ws.on('error', (err) => console.error('Bot error:', err.message));
@@ -511,24 +602,84 @@ function startLocalServer() {
 // MAIN
 // ============================================
 
+async function getBroadcasterIdWithRetry(maxAttempts = 3) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await getBroadcasterId();
+    } catch (e) {
+      if (attempt === maxAttempts) throw e;
+      const delay = 1000 * attempt;
+      console.log(`⚠️  API failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
+function gracefulShutdown(signal) {
+  console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+
+  // Clear all reconnect timeouts
+  Object.keys(reconnectState).forEach(name => {
+    if (reconnectState[name].timeout) {
+      clearTimeout(reconnectState[name].timeout);
+    }
+  });
+
+  // Close all overlay clients
+  for (const client of overlayClients) {
+    try {
+      client.close(1000, 'Server shutting down');
+    } catch (e) { /* ignore */ }
+  }
+  overlayClients.clear();
+
+  // Close WebSocket connections
+  if (chatSocket?.readyState === WebSocket.OPEN) {
+    chatSocket.close();
+  }
+  if (botSocket?.readyState === WebSocket.OPEN) {
+    botSocket.close();
+  }
+
+  console.log('👋 Goodbye!');
+  process.exit(0);
+}
+
 async function main() {
   console.log('');
   console.log('🎬 OBS Overlay Server');
   console.log('═'.repeat(40));
   console.log('');
 
+  // Handle graceful shutdown
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+  // Handle uncaught errors (don't crash)
+  process.on('uncaughtException', (err) => {
+    console.error('❌ Uncaught exception:', err.message);
+    console.error(err.stack);
+    // Don't exit - try to keep running
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled rejection:', reason);
+    // Don't exit - try to keep running
+  });
+
   if (!CLIENT_ID || !ACCESS_TOKEN) {
     console.error('❌ Missing credentials in ~/twitch-secrets/.env');
     process.exit(1);
   }
 
-  // Get broadcaster ID
+  // Get broadcaster ID with retry
   console.log(`👤 User: ${USERNAME}`);
   try {
-    broadcasterId = await getBroadcasterId();
+    broadcasterId = await getBroadcasterIdWithRetry(3);
     console.log(`🆔 ID: ${broadcasterId}`);
   } catch (e) {
-    console.error('❌ Could not find Twitch user:', e.message);
+    console.error('❌ Could not find Twitch user after 3 attempts:', e.message);
+    console.error('   Check your network connection and credentials');
     process.exit(1);
   }
   console.log('');
@@ -551,7 +702,7 @@ async function main() {
   console.log('');
   console.log('🧪 Test: node overlay/test/trigger.js follow "TestUser"');
   console.log('');
-  console.log('⏳ Waiting for events...');
+  console.log('⏳ Waiting for events... (Ctrl+C to quit)');
   console.log('');
 
   // Handle test flag
@@ -563,4 +714,7 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error('❌ Fatal error:', err.message);
+  process.exit(1);
+});
