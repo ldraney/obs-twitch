@@ -453,8 +453,9 @@ lofi/
 
 **Testing (Playwright):**
 ```bash
-npm run test:lofi          # Run all 39 tests
-npm run test:lofi:smoke    # Smoke tests only
+npm run test:lofi          # Run all tests (smoke + visual)
+npm run test:lofi:smoke    # Smoke tests only (functional)
+npm run test:lofi:visual   # Visual regression tests
 npm run test:lofi:headed   # See the browser
 npm run test:lofi:ui       # Playwright UI mode
 npm run test:lofi:update   # Update visual baselines
@@ -462,8 +463,16 @@ npm run test:lofi:update   # Update visual baselines
 
 Tests cover: page load, ES modules, canvas rendering, play/stop, timeline, sliders, keyboard shortcuts, audio clipping.
 
+**CI Integration:**
+- Tests run automatically on PRs touching `lofi/`
+- Smoke tests must pass to merge
+- Visual tests compare against committed baselines
+- To update baselines after intentional changes:
+  1. Run `npm run test:lofi:update` locally, or
+  2. Use workflow_dispatch with "Update visual baselines" checkbox
+- Baselines stored in `lofi/tests/snapshots/`
+
 **Open Issues:**
 - #21: Refine canvas smoothness/FPS
 - #24: Decouple audio and visual systems (in progress)
-- #25: Playwright QA suite (done)
-- #26: CI integration for tests
+- #26: CI integration for tests (in progress)

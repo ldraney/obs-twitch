@@ -1,0 +1,7 @@
+# Test output (not committed)
+test-results/
+playwright-report/
+
+# Diff images from failed tests
+*-diff.png
+*-actual.png

@@ -78,4 +78,11 @@ module.exports = defineConfig({
       maxDiffPixelRatio: 0.05,
     },
   },
+
+  // Snapshot configuration
+  snapshotDir: './snapshots',
+  snapshotPathTemplate: '{snapshotDir}/{testFilePath}/{arg}{ext}',
+
+  // Output directories
+  outputDir: './test-results',
 });
