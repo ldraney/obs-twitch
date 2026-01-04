@@ -286,42 +286,27 @@
 
   <div class="hint">Click timeline to jump</div>
 
-  <script>
+  <script type="module">
     // ============================================================================
-    // UTILITY FUNCTIONS
+    // IMPORTS
     // ============================================================================
 
-    function lerp(current, target, factor) {
-      return current + (target - current) * factor;
-    }
-
-    function map(value, inMin, inMax, outMin, outMax) {
-      return ((value - inMin) / (inMax - inMin)) * (outMax - outMin) + outMin;
-    }
-
-    function clamp(value, min, max) {
-      return Math.min(Math.max(value, min), max);
-    }
-
-    function createSmoother(factor = 0.1) {
-      let value = null;
-      return function smooth(target) {
-        if (value === null) value = target;
-        else value = lerp(value, target, factor);
-        return value;
-      };
-    }
+    import { CosmicVisuals } from '../lib/cosmic-visuals.js';
+    import { AudioAnalyzer } from '../lib/audio-analysis.js';
 
     // ============================================================================
     // GLOBAL STATE
     // ============================================================================
 
     const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
 
     let isInitialized = false;
     let isPlaying = false;
     let currentSectionIndex = 0;
+
+    // Modules
+    let visuals = null;
+    let audioAnalyzer = null;
 
     // Audio nodes
     let masterFilter, reverb, delay, compressor;
@@ -330,9 +315,6 @@
     let spaceNoise, noiseFilter;
     let filterLFO, padLFO;
     let drumLoop, padLoop, bassLoop, arpLoop, atmosphereLoop;
-
-    // Audio analyzers
-    let fft, meter;
 
     // Song structure (72 bars @ 68 BPM = ~4:14)
     const songStructure = [
@@ -374,85 +356,14 @@
     };
 
     // ============================================================================
-    // STAR FIELD
+    // INITIALIZE VISUALS
     // ============================================================================
 
-    const STAR_LAYERS = 3;
-    const STARS_PER_LAYER = [200, 150, 100]; // Back to front
-    const STAR_SPEEDS = [0.1, 0.3, 0.6];
-    const STAR_SIZES = [1, 1.5, 2.5];
-    let starLayers = [];
-
-    // Shooting stars
-    let shootingStars = [];
-    const MAX_SHOOTING_STARS = 5;
-
-    // Nebula particles
-    let nebulaParticles = [];
-    const NEBULA_PARTICLE_COUNT = 30;
-
-    // Aurora waves
-    let auroraPhase = 0;
-
-    // Smoothers
-    const smoothers = {
-      rms: createSmoother(0.12),
-      bass: createSmoother(0.15),
-      mid: createSmoother(0.1),
-      high: createSmoother(0.2),
-      bands: Array.from({ length: 8 }, () => createSmoother(0.15)),
-    };
-
-    // Visual state
-    let cosmicHue = 260; // Purple base
-    let pulseIntensity = 0;
-    let prevRms = 0;
-
-    // ============================================================================
-    // CANVAS SETUP
-    // ============================================================================
-
-    function resize() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      initStarField();
-      initNebulaParticles();
-    }
-
-    window.addEventListener('resize', resize);
-    resize();
-
-    function initStarField() {
-      starLayers = [];
-      for (let layer = 0; layer < STAR_LAYERS; layer++) {
-        const stars = [];
-        for (let i = 0; i < STARS_PER_LAYER[layer]; i++) {
-          stars.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
-            twinklePhase: Math.random() * Math.PI * 2,
-            twinkleSpeed: 0.02 + Math.random() * 0.03,
-            baseAlpha: 0.3 + Math.random() * 0.7
-          });
-        }
-        starLayers.push(stars);
-      }
-    }
-
-    function initNebulaParticles() {
-      nebulaParticles = [];
-      for (let i = 0; i < NEBULA_PARTICLE_COUNT; i++) {
-        nebulaParticles.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          radius: 50 + Math.random() * 150,
-          hue: 240 + Math.random() * 60, // Purple to magenta
-          alpha: 0.02 + Math.random() * 0.03,
-          driftX: (Math.random() - 0.5) * 0.2,
-          driftY: (Math.random() - 0.5) * 0.1
-        });
-      }
-    }
+    visuals = new CosmicVisuals(canvas, {
+      baseHue: 260,
+      nebulaCount: 30,
+      maxShootingStars: 5
+    });
 
     // ============================================================================
     // AUDIO INITIALIZATION
@@ -462,6 +373,10 @@
       if (isInitialized) return;
 
       await Tone.start();
+
+      // Initialize audio analyzer
+      audioAnalyzer = new AudioAnalyzer({ bandCount: 8 });
+      audioAnalyzer.init();
 
       Tone.Transport.bpm.value = 68;
       Tone.Transport.swing = 0.08;
@@ -500,12 +415,6 @@
       delay = new Tone.FeedbackDelay('8n.', 0.4);
       delay.wet.value = 0.25;
       delay.connect(masterFilter);
-
-      // Audio analyzers
-      fft = new Tone.FFT(256);
-      meter = new Tone.Meter();
-      Tone.Destination.connect(fft);
-      Tone.Destination.connect(meter);
 
       // Space noise (filtered white noise - radio static)
       noiseFilter = new Tone.Filter(800, 'bandpass').connect(compressor);
@@ -629,8 +538,8 @@
           hihat.triggerAttackRelease('32n', time + humanize(), vel);
 
           // Trigger shooting star on hi-hat
-          if (Math.random() > 0.7) {
-            spawnShootingStar();
+          if (Math.random() > 0.7 && visuals) {
+            visuals.spawnShootingStar();
           }
         }
       }, '16n');
@@ -680,19 +589,6 @@
         const note = droneNotes[Math.floor(Math.random() * droneNotes.length)];
         atmosphereSynth.triggerAttackRelease(note, '4m', time, 0.3);
       }, '4m');
-    }
-
-    function spawnShootingStar() {
-      if (shootingStars.length >= MAX_SHOOTING_STARS) return;
-
-      shootingStars.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height * 0.5,
-        vx: 8 + Math.random() * 8,
-        vy: 4 + Math.random() * 4,
-        life: 1,
-        length: 30 + Math.random() * 50
-      });
     }
 
     // ============================================================================
@@ -841,294 +737,18 @@
     }
 
     // ============================================================================
-    // AUDIO ANALYSIS
-    // ============================================================================
-
-    function getAudioFeatures() {
-      if (!fft || !meter) {
-        return { bands: new Array(8).fill(0), rms: 0, bass: 0, mid: 0, high: 0 };
-      }
-
-      const fftValues = fft.getValue();
-      const rmsDb = meter.getValue();
-      const rms = clamp(map(rmsDb, -60, -6, 0, 1), 0, 1);
-
-      const numBins = fftValues.length;
-      const bandsPerGroup = Math.floor(numBins / 8);
-      const bands = [];
-
-      for (let i = 0; i < 8; i++) {
-        const start = i * bandsPerGroup;
-        const end = Math.min(start + bandsPerGroup, numBins);
-        let sum = 0;
-        for (let j = start; j < end; j++) {
-          const linear = clamp(map(fftValues[j], -100, -20, 0, 1), 0, 1);
-          sum += linear;
-        }
-        bands.push(sum / (end - start));
-      }
-
-      const bass = (bands[0] + bands[1]) / 2;
-      const mid = (bands[2] + bands[3] + bands[4]) / 3;
-      const high = (bands[5] + bands[6] + bands[7]) / 3;
-
-      return { bands, rms, bass, mid, high };
-    }
-
-    // ============================================================================
-    // DRAWING
-    // ============================================================================
-
-    function drawBackground(width, height, smoothedRms, smoothedBass) {
-      // Deep space gradient
-      const gradient = ctx.createRadialGradient(
-        width / 2, height / 2, 0,
-        width / 2, height / 2, Math.max(width, height) * 0.8
-      );
-
-      const pulseAmount = smoothedBass * 0.15;
-      const baseLightness = 3 + pulseAmount * 5;
-
-      gradient.addColorStop(0, `hsl(${cosmicHue + 20}, 40%, ${baseLightness + 3}%)`);
-      gradient.addColorStop(0.5, `hsl(${cosmicHue}, 30%, ${baseLightness}%)`);
-      gradient.addColorStop(1, `hsl(${cosmicHue - 20}, 25%, ${baseLightness - 1}%)`);
-
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, width, height);
-    }
-
-    function drawNebulaParticles(width, height, smoothedMid) {
-      nebulaParticles.forEach(particle => {
-        // Drift slowly
-        particle.x += particle.driftX;
-        particle.y += particle.driftY;
-
-        // Wrap around
-        if (particle.x < -particle.radius) particle.x = width + particle.radius;
-        if (particle.x > width + particle.radius) particle.x = -particle.radius;
-        if (particle.y < -particle.radius) particle.y = height + particle.radius;
-        if (particle.y > height + particle.radius) particle.y = -particle.radius;
-
-        // Draw nebula cloud
-        const gradient = ctx.createRadialGradient(
-          particle.x, particle.y, 0,
-          particle.x, particle.y, particle.radius
-        );
-
-        const alpha = particle.alpha * (0.8 + smoothedMid * 0.5);
-        gradient.addColorStop(0, `hsla(${particle.hue}, 60%, 40%, ${alpha})`);
-        gradient.addColorStop(0.5, `hsla(${particle.hue + 20}, 50%, 30%, ${alpha * 0.5})`);
-        gradient.addColorStop(1, 'transparent');
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-
-    function drawAurora(width, height, smoothedBands, time) {
-      auroraPhase += 0.005;
-
-      const auroraY = height * 0.3;
-      const amplitude = 50 + smoothedBands[2] * 100;
-
-      ctx.globalAlpha = 0.15 + smoothedBands[3] * 0.2;
-
-      for (let wave = 0; wave < 3; wave++) {
-        const waveHue = cosmicHue + wave * 30 + 120; // Greens and cyans
-        const waveOffset = wave * 0.5;
-
-        ctx.beginPath();
-        ctx.moveTo(0, auroraY);
-
-        for (let x = 0; x <= width; x += 5) {
-          const y = auroraY +
-            Math.sin((x * 0.005) + auroraPhase + waveOffset) * amplitude +
-            Math.sin((x * 0.01) + auroraPhase * 1.5) * amplitude * 0.5;
-          ctx.lineTo(x, y);
-        }
-
-        ctx.lineTo(width, 0);
-        ctx.lineTo(0, 0);
-        ctx.closePath();
-
-        const gradient = ctx.createLinearGradient(0, auroraY - amplitude, 0, 0);
-        gradient.addColorStop(0, `hsla(${waveHue}, 70%, 50%, 0.3)`);
-        gradient.addColorStop(1, 'transparent');
-        ctx.fillStyle = gradient;
-        ctx.fill();
-      }
-
-      ctx.globalAlpha = 1;
-    }
-
-    function drawStarField(width, height, smoothedRms, dt) {
-      starLayers.forEach((stars, layerIndex) => {
-        const speed = STAR_SPEEDS[layerIndex];
-        const size = STAR_SIZES[layerIndex];
-
-        stars.forEach(star => {
-          // Parallax movement (subtle drift)
-          star.x -= speed * dt * 60 * (0.5 + smoothedRms * 0.5);
-          if (star.x < 0) {
-            star.x = width;
-            star.y = Math.random() * height;
-          }
-
-          // Twinkle
-          star.twinklePhase += star.twinkleSpeed;
-          const twinkle = 0.5 + Math.sin(star.twinklePhase) * 0.5;
-          const alpha = star.baseAlpha * twinkle * (0.6 + smoothedRms * 0.4);
-
-          // Draw star with glow
-          const starSize = size * (0.8 + smoothedRms * 0.4);
-
-          // Glow
-          ctx.beginPath();
-          ctx.arc(star.x, star.y, starSize * 3, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(200, 180, 255, ${alpha * 0.1})`;
-          ctx.fill();
-
-          // Core
-          ctx.beginPath();
-          ctx.arc(star.x, star.y, starSize, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-          ctx.fill();
-        });
-      });
-    }
-
-    function drawShootingStars(width, height, dt) {
-      shootingStars = shootingStars.filter(star => {
-        star.x += star.vx * dt * 60;
-        star.y += star.vy * dt * 60;
-        star.life -= dt * 1.5;
-
-        if (star.life <= 0 || star.x > width || star.y > height) {
-          return false;
-        }
-
-        // Draw trail
-        const gradient = ctx.createLinearGradient(
-          star.x, star.y,
-          star.x - star.vx * star.length / star.vx,
-          star.y - star.vy * star.length / star.vy
-        );
-
-        gradient.addColorStop(0, `rgba(255, 255, 255, ${star.life})`);
-        gradient.addColorStop(1, 'transparent');
-
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(star.x, star.y);
-        ctx.lineTo(
-          star.x - (star.vx / Math.abs(star.vx)) * star.length * star.life,
-          star.y - (star.vy / Math.abs(star.vy)) * star.length * 0.5 * star.life
-        );
-        ctx.stroke();
-
-        // Draw head
-        ctx.beginPath();
-        ctx.arc(star.x, star.y, 2, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${star.life})`;
-        ctx.fill();
-
-        return true;
-      });
-    }
-
-    function drawCentralGlow(width, height, smoothedRms, smoothedBass) {
-      // Pulsing central glow (like a distant star or the sun)
-      const centerX = width / 2;
-      const centerY = height * 0.4;
-      const baseRadius = 100 + smoothedBass * 150;
-      const pulseRadius = baseRadius * (1 + pulseIntensity * 0.3);
-
-      const gradient = ctx.createRadialGradient(
-        centerX, centerY, 0,
-        centerX, centerY, pulseRadius
-      );
-
-      const glowAlpha = 0.1 + smoothedRms * 0.15;
-      gradient.addColorStop(0, `hsla(${cosmicHue + 60}, 50%, 70%, ${glowAlpha})`);
-      gradient.addColorStop(0.3, `hsla(${cosmicHue + 40}, 40%, 50%, ${glowAlpha * 0.5})`);
-      gradient.addColorStop(1, 'transparent');
-
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, pulseRadius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // ============================================================================
     // RENDER LOOP
     // ============================================================================
 
-    let lastTime = performance.now();
-
     function render() {
-      const now = performance.now();
-      const dt = Math.min((now - lastTime) / 1000, 0.05);
-      lastTime = now;
-
-      const { width, height } = canvas;
-
       // Get audio features
-      const audioFeatures = getAudioFeatures();
+      const audioFeatures = audioAnalyzer ? audioAnalyzer.analyze() : {
+        rms: 0, bass: 0, mid: 0, high: 0, bands: new Array(8).fill(0), pulse: 0
+      };
 
-      // Smooth features
-      const smoothedRms = smoothers.rms(audioFeatures.rms);
-      const smoothedBass = smoothers.bass(audioFeatures.bass);
-      const smoothedMid = smoothers.mid(audioFeatures.mid);
-      const smoothedHigh = smoothers.high(audioFeatures.high);
-      const smoothedBands = audioFeatures.bands.map((b, i) => smoothers.bands[i](b));
-
-      // Detect bass hits for pulse
-      const rmsDelta = smoothedRms - prevRms;
-      if (rmsDelta > 0.03) {
-        pulseIntensity = Math.max(pulseIntensity, rmsDelta * 8);
-      }
-      pulseIntensity *= 0.94;
-      prevRms = smoothedRms;
-
-      // Update cosmic hue slowly (drifting through purples/blues)
-      cosmicHue = 260 + Math.sin(now * 0.0001) * 30;
-
-      // ========================================================================
-      // DRAWING LAYERS
-      // ========================================================================
-
-      // 1. Deep space background
-      drawBackground(width, height, smoothedRms, smoothedBass);
-
-      // 2. Nebula clouds (behind stars)
-      drawNebulaParticles(width, height, smoothedMid);
-
-      // 3. Aurora waves (mid layer)
-      drawAurora(width, height, smoothedBands, now);
-
-      // 4. Central glow
-      drawCentralGlow(width, height, smoothedRms, smoothedBass);
-
-      // 5. Star field (parallax layers)
-      drawStarField(width, height, smoothedRms, dt);
-
-      // 6. Shooting stars (on top)
-      drawShootingStars(width, height, dt);
-
-      // 7. Bass pulse overlay
-      if (pulseIntensity > 0.1) {
-        const pulseGradient = ctx.createRadialGradient(
-          width / 2, height / 2, 0,
-          width / 2, height / 2, Math.max(width, height)
-        );
-        pulseGradient.addColorStop(0, `rgba(138, 100, 255, ${pulseIntensity * 0.1})`);
-        pulseGradient.addColorStop(1, 'transparent');
-        ctx.fillStyle = pulseGradient;
-        ctx.fillRect(0, 0, width, height);
-      }
+      // Update and draw visuals
+      visuals.update(audioFeatures, 1.0);
+      visuals.draw();
 
       // Update UI
       if (isPlaying) {
@@ -1244,6 +864,8 @@
     // Cleanup
     window.addEventListener('beforeunload', () => {
       if (isPlaying) stopPlayback();
+      if (visuals) visuals.dispose();
+      if (audioAnalyzer) audioAnalyzer.dispose();
     });
 
     // Start render loop
