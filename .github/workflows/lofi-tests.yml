@@ -1,0 +1,153 @@
+name: Lofi Tests
+
+on:
+  pull_request:
+    paths:
+      - 'lofi/**'
+      - '.github/workflows/lofi-tests.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'lofi/**'
+      - '.github/workflows/lofi-tests.yml'
+  workflow_dispatch:
+    inputs:
+      update_baselines:
+        description: 'Update visual baselines'
+        type: boolean
+        default: false
+
+jobs:
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run smoke tests
+        run: npm run test:lofi:smoke
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-report
+          path: lofi/tests/playwright-report/
+          retention-days: 7
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-failures
+          path: lofi/tests/test-results/
+          retention-days: 7
+
+  visual-tests:
+    name: Visual Regression
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run visual tests
+        id: visual-tests
+        run: npm run test:lofi:visual
+        continue-on-error: true
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-test-report
+          path: lofi/tests/playwright-report/
+          retention-days: 7
+
+      - name: Upload failure artifacts
+        if: steps.visual-tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-test-failures
+          path: lofi/tests/test-results/
+          retention-days: 7
+
+      - name: Check for missing baselines
+        if: steps.visual-tests.outcome == 'failure'
+        run: |
+          if grep -r "Missing baseline" lofi/tests/test-results/ 2>/dev/null; then
+            echo "::warning::Visual tests failed due to missing baselines. Run 'npm run test:lofi:update' locally or use workflow_dispatch with update_baselines=true"
+          fi
+
+      - name: Fail if visual tests failed
+        if: steps.visual-tests.outcome == 'failure'
+        run: exit 1
+
+  update-baselines:
+    name: Update Visual Baselines
+    runs-on: ubuntu-latest
+    if: github.event.inputs.update_baselines == 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Update baselines
+        run: npm run test:lofi:update
+
+      - name: Upload new baselines
+        uses: actions/upload-artifact@v4
+        with:
+          name: updated-baselines
+          path: lofi/tests/snapshots/
+          retention-days: 30
+
+      - name: Commit baselines (if on branch)
+        if: github.ref != 'refs/heads/master'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lofi/tests/snapshots/
+          git diff --staged --quiet || git commit -m "Update visual baselines
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+          Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          git push
