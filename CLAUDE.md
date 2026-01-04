@@ -417,3 +417,38 @@ related: [[other-doc]]
 5. Movement - subtle changes over time
 6. Structure - journey from start to finish
 7. Ear candy - surprises that reward listening
+
+### Cosmic Lofi Songs (Audio-Visual Experiences)
+
+Full songs with reactive canvas visuals. Located in `lofi/songs/`.
+
+**Songs:**
+| Song | BPM | Duration | Vibe |
+|------|-----|----------|------|
+| Space Drift | 68 | 4:14 | Calm, ambient, floating |
+| Supernova | 75 | 3:50 | Dynamic, dual climaxes |
+
+**Index Page:** `lofi/songs/index.html` - Collection dashboard with metrics
+
+**Visual System (shared across songs):**
+- Star field (3 parallax layers)
+- Nebula particles (drifting clouds)
+- Aurora waves (frequency-reactive)
+- Central glow (bass-reactive)
+- Shooting stars (triggered by hi-hats)
+- Color shifting based on intensity
+
+**Song Structure Pattern:**
+```javascript
+const songStructure = [
+  { name: 'section', startBar: 0, bars: 8, intensity: 0.1 },
+  // ... more sections
+];
+// Use Tone.Transport.loop for seamless looping
+Tone.Transport.loop = true;
+Tone.Transport.loopEnd = `${totalBars}:0:0`;
+```
+
+**Open Issues:**
+- #21: Refine canvas smoothness/FPS
+- #22: Extract reusable visual system (cosmic-visuals.js)
