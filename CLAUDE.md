@@ -394,129 +394,40 @@ ping -n 5 10.0.0.1             # Test latency (should be <5ms)
 
 ---
 
-## Lofi Music Development (Issue #15)
+## Satellite Repos
 
-Learning system for creating lofi beats with Tone.js. Obsidian vault + interactive demos.
+This repo is the **centroid** that coordinates streaming infrastructure. Related repos:
 
-### Locations
-- **Docs**: `~/lofi-development-docs/` (Obsidian vault)
-- **Demos**: `lofi/demos/*.html` (interactive HTML)
-- **Original generator**: `lofi/index.html`
+| Repo | Location | Purpose |
+|------|----------|---------|
+| `twitch-secrets` | `~/twitch-secrets/` | API credentials (.env with tokens) |
+| `twitch-client` | `~/twitch-client/` | Token refresh: `node auth.js refresh` |
+| `lofi-overlay` | `~/lofi-overlay/` | Audio-reactive visual overlays for OBS |
+| `butlerbotphilo` | `~/butlerbotphilo/` | Butler bot personality guide |
+| `lofi-development-docs` | `~/lofi-development-docs/` | Obsidian vault for lofi learning |
 
-### Progress Tracker
-- [x] Phase 1: Foundations (what-makes-lofi, tone-js-basics, audio-signal-flow, glossary)
-- [x] Phase 2: Sound Sources (oscillators, synthesis-types, samplers)
-- [x] Phase 3: Effects (reverb, delay, filters, distortion, effects-chain)
-- [x] Phase 4: Rhythm (tempo-and-time, drum-patterns, swing, ghost-notes)
-- [x] Phase 5: Harmony (chord-theory, chord-progressions, bass-lines)
-- [x] Phase 6: Dynamics (lfos, automation, humanization)
-- [x] Phase 7: Arrangement (song-structure, builds-and-drops, transitions)
-- [x] Phase 8: Projects (simple-beat, dusty-chords, groove-master, living-sound, epic-song)
-- [x] Phase 9: Cheatsheets (tone-js-cheatsheet, lofi-recipes)
+### Token Refresh Workflow
 
-### Audio Initialization Pattern (IMPORTANT)
-Synths MUST be created AFTER `Tone.start()` is called. The working pattern:
-```javascript
-async function startAudio() {
-  await Tone.start();           // 1. Start audio context FIRST
-  synth = new Tone.Synth()...   // 2. THEN create synths
-  loop = new Tone.Loop...       // 3. Create loops
-  Tone.Transport.start();       // 4. Start playback
-}
-```
+When Twitch tokens expire (overlay server fails to connect):
 
-### Known Bug: Tone.Sequence Timing Errors (Issue #16)
-**Status:** `03-groove-master.html` throws timing errors on play.
-**Error:** "The time must be greater than or equal to the last scheduled time"
-**Workaround:** Use `Tone.Loop` instead of `Tone.Sequence` (see `lofi/index.html`)
-
-### Doc Template (Obsidian with full features)
-```yaml
----
-tags: [lofi, tone-js, <topic>]
-demo: ../../obs-twitch/lofi/demos/<name>.html
-related: [[other-doc]]
----
-```
-
-### Demo Template
-- Dark theme matching vault aesthetic
-- Interactive controls (sliders, buttons)
-- Real-time audio with Tone.js
-- Status feedback
-
-### Key Concepts ("Gauges" to tweak)
-| Category | Parameters |
-|----------|------------|
-| Sound Sources | oscillator type, ADSR envelope |
-| Effects | reverb decay/wet, delay time/feedback, filter cutoff/resonance |
-| Rhythm | BPM (60-90), swing (0-0.5), velocity variation |
-| Dynamics | LFO rate/depth, automation curves |
-
-### What Makes Epic Lofi
-1. Vibe - consistent mood
-2. Groove - drums that make you nod
-3. Space - reverb/delay depth
-4. Texture - vinyl noise, warmth
-5. Movement - subtle changes over time
-6. Structure - journey from start to finish
-7. Ear candy - surprises that reward listening
-
-### Audio-Visual Architecture
-
-Decoupled system where any sound can drive any visual theme. See `lofi/ARCHITECTURE.md`.
-
-**Directory Structure:**
-```
-lofi/
-  lib/              # Shared utilities
-  visuals/          # Standalone visual themes
-    cosmic/         # Stars, nebulas, aurora
-  sounds/           # Standalone audio engines (WIP)
-  experiences/      # Combined audio + visuals
-    space-drift.html
-    supernova.html
-    index.html      # Gallery
-```
-
-**Experiences:**
-| Experience | BPM | Duration | Vibe |
-|------------|-----|----------|------|
-| Space Drift | 68 | 4:14 | Calm, ambient, floating |
-| Supernova | 75 | 3:50 | Dynamic, dual climaxes |
-| Midnight Rain | 70 | 3:26 | Melancholy, introspective, sparse piano |
-
-**Visual Themes:**
-- `cosmic` - Star field, nebulas, aurora, shooting stars, color shifting
-
-**Signal Interface (connects sounds to visuals):**
-- `beat` - Drum hit trigger
-- `bass/mids/highs` - Frequency energy (0-1)
-- `intensity` - Overall loudness (0-1)
-- `section` - Current song section
-
-**Testing (Playwright):**
 ```bash
-npm run test:lofi          # Run all tests (smoke + visual)
-npm run test:lofi:smoke    # Smoke tests only (functional)
-npm run test:lofi:visual   # Visual regression tests
-npm run test:lofi:headed   # See the browser
-npm run test:lofi:ui       # Playwright UI mode
-npm run test:lofi:update   # Update visual baselines
+# Refresh main user token
+cd ~/twitch-client && node auth.js refresh
+# Copy new TWITCH_ACCESS_TOKEN to ~/twitch-secrets/.env
+
+# Refresh bot token (manual curl)
+source ~/twitch-secrets/.env
+curl -s -X POST 'https://id.twitch.tv/oauth2/token' \
+  -d "client_id=$TWITCH_CLIENT_ID&client_secret=$TWITCH_CLIENT_SECRET&grant_type=refresh_token&refresh_token=$BOT_REFRESH_TOKEN"
+# Copy new access_token to BOT_ACCESS_TOKEN in ~/twitch-secrets/.env
 ```
 
-Tests cover: page load, ES modules, canvas rendering, play/stop, timeline, sliders, keyboard shortcuts, audio clipping.
+### Daily Stream Startup
 
-**CI Integration:**
-- Tests run automatically on PRs touching `lofi/`
-- Smoke tests must pass to merge
-- Visual tests compare against committed baselines
-- To update baselines after intentional changes:
-  1. Run `npm run test:lofi:update` locally, or
-  2. Use workflow_dispatch with "Update visual baselines" checkbox
-- Baselines stored in `lofi/tests/snapshots/`
+```bash
+# 1. Start overlay server (celebrations + chat)
+npm run alerts
 
-**Open Issues:**
-- #21: Refine canvas smoothness/FPS
-- #24: Decouple audio and visual systems (in progress)
-- #26: CI integration for tests (in progress)
+# 2. Pre-flight check + go live
+npm run obs go
+```
