@@ -440,6 +440,7 @@ lofi/
 |------------|-----|----------|------|
 | Space Drift | 68 | 4:14 | Calm, ambient, floating |
 | Supernova | 75 | 3:50 | Dynamic, dual climaxes |
+| Midnight Rain | 70 | 3:26 | Melancholy, introspective, sparse piano |
 
 **Visual Themes:**
 - `cosmic` - Star field, nebulas, aurora, shooting stars, color shifting
