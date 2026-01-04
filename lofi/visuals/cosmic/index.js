@@ -11,6 +11,7 @@
  */
 
 import { lerp } from '../../lib/utils.js';
+import { presets } from './presets.js';
 
 /**
  * Default configuration for cosmic visuals
@@ -51,6 +52,14 @@ const DEFAULT_CONFIG = {
 
 /**
  * CosmicVisuals class for rendering reactive space backgrounds
+ *
+ * Implements VisualTheme interface:
+ * - update(signals, deltaTime) - Update state from AudioSignals
+ * - render() - Render to canvas
+ * - dispose() - Clean up resources
+ * - getParticles() - Get particles for morphing
+ * - setBlendWeight(weight) - Set crossfade blend weight
+ * - applyPreset(presetName) - Apply a named preset
  */
 export class CosmicVisuals {
   /**
@@ -62,6 +71,11 @@ export class CosmicVisuals {
     this.ctx = canvas.getContext('2d');
     this.config = { ...DEFAULT_CONFIG, ...config };
 
+    // Apply initial preset if specified
+    if (config.preset && presets[config.preset]) {
+      this.config = { ...this.config, ...presets[config.preset] };
+    }
+
     // Visual state
     this.starLayers = [];
     this.shootingStars = [];
@@ -69,6 +83,12 @@ export class CosmicVisuals {
     this.auroraPhase = 0;
     this.cosmicHue = this.config.baseHue;
     this.pulseIntensity = 0;
+
+    // Blend weight for crossfade transitions (0 = invisible, 1 = fully visible)
+    this.blendWeight = 1;
+
+    // Current section (for section-based preset changes)
+    this.currentSection = 'idle';
 
     // Time tracking
     this.lastTime = performance.now();
@@ -160,8 +180,76 @@ export class CosmicVisuals {
     this.pulseIntensity = Math.max(this.pulseIntensity, intensity);
   }
 
+
   /**
-   * Update visual state
+   * Apply a named preset configuration
+   * @param {string} presetName - Name of preset ('calm', 'dynamic', 'intense', 'sunrise')
+   */
+  applyPreset(presetName) {
+    const preset = presets[presetName];
+    if (!preset) {
+      console.warn(`CosmicVisuals: Unknown preset "${presetName}"`);
+      return;
+    }
+
+    // Merge preset into config (preserving non-preset config values)
+    this.config = { ...this.config, ...preset };
+
+    // Update cosmic hue to match new base
+    this.cosmicHue = this.config.baseHue;
+
+    // Reinitialize particles if nebula count changed
+    if (preset.nebulaCount !== undefined || preset.nebulaHueRange !== undefined) {
+      this.initNebulaParticles();
+    }
+  }
+
+  /**
+   * Set blend weight for crossfade transitions
+   * @param {number} weight - Blend weight (0 = invisible, 1 = fully visible)
+   */
+  setBlendWeight(weight) {
+    this.blendWeight = Math.max(0, Math.min(1, weight));
+  }
+
+  /**
+   * Get particles for morphing to another theme
+   * Returns star positions in normalized coordinates
+   * @returns {Array}
+   */
+  getParticles() {
+    const particles = [];
+    const { width, height } = this.canvas;
+
+    // Convert stars to normalized particle format
+    this.starLayers.forEach((stars, layerIndex) => {
+      const size = this.config.starSizes[layerIndex] || 1.5;
+      const speed = this.config.starSpeeds[layerIndex] || 0.3;
+
+      stars.forEach(star => {
+        particles.push({
+          x: star.x / width,
+          y: star.y / height,
+          size: size,
+          opacity: star.baseAlpha,
+          color: '#ffffff',
+          type: 'star',
+          velocity: { x: -speed * 0.01, y: 0 }
+        });
+      });
+    });
+
+    return particles;
+  }
+
+  /**
+   * Update visual state - supports both old API and new AudioSignals interface
+   *
+   * New API (VisualTheme interface):
+   * @param {AudioSignals} signals - Audio signals from sound engine
+   * @param {number} deltaTime - Milliseconds since last frame
+   *
+   * Old API (backward compatibility):
    * @param {Object} audioFeatures - Audio analysis features
    * @param {number} audioFeatures.rms - Overall loudness (0-1)
    * @param {number} audioFeatures.bass - Bass level (0-1)
@@ -171,21 +259,76 @@ export class CosmicVisuals {
    * @param {number} audioFeatures.pulse - Beat pulse intensity
    * @param {number} intensity - Overall intensity multiplier (0-1)
    */
-  update(audioFeatures = {}, intensity = 0.5) {
+  update(signalsOrFeatures = {}, deltaTimeOrIntensity = 0.5) {
     const now = performance.now();
-    const dt = Math.min((now - this.lastTime) / 1000, 0.05);
-    this.lastTime = now;
 
-    // Default audio features if not provided
-    const features = {
-      rms: 0,
-      bass: 0,
-      mid: 0,
-      high: 0,
-      bands: new Array(8).fill(0),
-      pulse: 0,
-      ...audioFeatures
-    };
+    // Detect which API is being used
+    // New API: signals have 'beat' (boolean) and deltaTime is in milliseconds (typically > 1)
+    // Old API: audioFeatures have 'rms' (number) and intensity is 0-1
+    const isNewApi = signalsOrFeatures.hasOwnProperty('beat') ||
+                     signalsOrFeatures.hasOwnProperty('section') ||
+                     deltaTimeOrIntensity > 1;
+
+    let dt, features, intensity;
+
+    if (isNewApi) {
+      // New AudioSignals API
+      const signals = signalsOrFeatures;
+      dt = Math.min(deltaTimeOrIntensity / 1000, 0.05); // Convert ms to seconds, cap at 50ms
+
+      // Convert AudioSignals to internal features format
+      features = {
+        rms: signals.intensity || 0,
+        bass: signals.bass || 0,
+        mid: signals.mids || 0,
+        high: signals.highs || 0,
+        bands: [
+          signals.bass || 0,
+          signals.bass || 0,
+          signals.mids || 0,
+          signals.mids || 0,
+          signals.highs || 0,
+          signals.highs || 0,
+          signals.highs || 0,
+          signals.highs || 0
+        ],
+        pulse: signals.beat ? 1 : 0
+      };
+
+      intensity = signals.intensity || 0.5;
+
+      // React to beat - spawn shooting star
+      if (signals.beat && Math.random() > 0.7) {
+        this.spawnShootingStar();
+      }
+
+      // React to section changes
+      if (signals.section && signals.section !== this.currentSection) {
+        this.currentSection = signals.section;
+        // Could trigger preset change based on section here
+      }
+    } else {
+      // Old API (backward compatibility)
+      dt = Math.min((now - this.lastTime) / 1000, 0.05);
+      features = {
+        rms: 0,
+        bass: 0,
+        mid: 0,
+        high: 0,
+        bands: new Array(8).fill(0),
+        pulse: 0,
+        ...signalsOrFeatures
+      };
+      intensity = deltaTimeOrIntensity;
+
+      // Use audio pulse if provided (scale by intensity for dynamic songs)
+      if (features.pulse > 0) {
+        const scaledPulse = this.config.intensityScalesSize ? features.pulse * (1 + intensity) : features.pulse;
+        this.setPulse(scaledPulse);
+      }
+    }
+
+    this.lastTime = now;
 
     // Update cosmic hue - either static or intensity-based
     const { baseHue, intensityHue, hueShiftSpeed, hueShiftRange, intensityScalesColors } = this.config;
@@ -199,12 +342,6 @@ export class CosmicVisuals {
     // Decay pulse - faster decay at high intensity
     const decayRate = this.config.intensityScalesSpeed ? 0.92 : 0.94;
     this.pulseIntensity *= decayRate;
-
-    // Use audio pulse if provided (scale by intensity for dynamic songs)
-    if (features.pulse > 0) {
-      const scaledPulse = this.config.intensityScalesSize ? features.pulse * (1 + intensity) : features.pulse;
-      this.setPulse(scaledPulse);
-    }
 
     // Update aurora phase (faster at high intensity if enabled)
     if (this.config.enableAurora) {
@@ -222,6 +359,14 @@ export class CosmicVisuals {
   }
 
   /**
+   * Render current state to canvas (VisualTheme interface)
+   * Alias for draw() to match interface
+   */
+  render() {
+    this.draw();
+  }
+
+  /**
    * Draw all visual layers
    */
   draw() {
@@ -230,6 +375,11 @@ export class CosmicVisuals {
     const dt = this._dt || 0.016;
     const features = this._features || { rms: 0, bass: 0, mid: 0, high: 0, bands: new Array(8).fill(0) };
     const intensity = this._intensity || 0.5;
+
+    // Apply blend weight for crossfade
+    if (this.blendWeight < 1) {
+      ctx.globalAlpha = this.blendWeight;
+    }
 
     // Scale features by intensity
     const scaledFeatures = {
@@ -267,6 +417,11 @@ export class CosmicVisuals {
       (this.config.intensityScalesColors && intensity > 0.5);
     if (showPulse) {
       this._drawPulseOverlay(width, height);
+    }
+
+    // Reset global alpha
+    if (this.blendWeight < 1) {
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -403,7 +558,11 @@ export class CosmicVisuals {
   _drawStarField(width, height, rms, dt) {
     const ctx = this.ctx;
     const intensity = this._intensity || 0;
+    const features = this._features || {};
     const { starSpeeds, starSizes, intensityScalesSpeed, intensityScalesSize, intensityScalesColors } = this.config;
+
+    // Boost twinkle based on highs signal
+    const highsBoost = features.high || 0;
 
     this.starLayers.forEach((stars, layerIndex) => {
       // Speed scales with intensity if enabled
@@ -422,8 +581,8 @@ export class CosmicVisuals {
           star.y = Math.random() * height;
         }
 
-        // Twinkle (faster at high intensity if enabled)
-        const twinkleSpeed = intensityScalesSpeed ? star.twinkleSpeed * (1 + intensity) : star.twinkleSpeed;
+        // Twinkle (faster at high intensity if enabled, and boosted by highs)
+        const twinkleSpeed = (intensityScalesSpeed ? star.twinkleSpeed * (1 + intensity) : star.twinkleSpeed) * (1 + highsBoost);
         star.twinklePhase += twinkleSpeed;
         const twinkle = 0.5 + Math.sin(star.twinklePhase) * 0.5;
         const alpha = star.baseAlpha * twinkle * (0.6 + rms * 0.4 + (intensityScalesColors ? intensity * 0.3 : 0));
@@ -562,9 +721,15 @@ export class CosmicVisuals {
   }
 
   /**
-   * Clean up event listeners
+   * Clean up event listeners and resources
    */
   dispose() {
     window.removeEventListener('resize', this._resizeHandler);
+    this.starLayers = [];
+    this.shootingStars = [];
+    this.nebulaParticles = [];
   }
 }
+
+// Export presets for external use
+export { presets };
