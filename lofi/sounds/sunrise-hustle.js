@@ -79,8 +79,8 @@ const SECTION_CONFIGS = {
     filterFreq: 2200, reverbWet: 0.4, chordsVol: -10
   },
   breathe: {
-    drums: false, bass: false, chords: true, melody: false,
-    filterFreq: 600, reverbWet: 0.6, chordsVol: -18
+    drums: false, bass: true, chords: true, melody: false,
+    filterFreq: 900, reverbWet: 0.55, chordsVol: -12
   },
   hustle: {
     drums: true, bass: true, chords: true, melody: true,
