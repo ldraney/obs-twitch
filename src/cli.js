@@ -299,61 +299,6 @@ program
     }
   });
 
-// Overlay
-program
-  .command('overlay <action>')
-  .description('Control terminal overlay (show/hide/create/0.0-1.0)')
-  .action(async (action) => {
-    try {
-      const result = await obs.controlOverlay(action);
-
-      if (result.created) {
-        console.log(chalk.green(`Created "${result.name}"`));
-        console.log(`Scaled to ${result.width}x${result.height}`);
-        console.log(chalk.yellow('\nNote: In OBS, you may need to select the correct window'));
-      } else if (result.action === 'show') {
-        console.log(chalk.green(`${result.name} SHOWN`));
-      } else if (result.action === 'hide') {
-        console.log(chalk.yellow(`${result.name} HIDDEN`));
-      } else if (result.action === 'opacity') {
-        console.log(chalk.green(`${result.name} opacity set to ${(result.opacity * 100).toFixed(0)}%`));
-      }
-    } catch (error) {
-      console.error(chalk.red('Failed:'), error.message);
-    } finally {
-      await obs.disconnect();
-    }
-  });
-
-// Celebration overlay (browser source for follower alerts)
-program
-  .command('celebration <action>')
-  .description('Control celebration overlay (create/show/hide/refresh)')
-  .action(async (action) => {
-    try {
-      const result = await obs.controlCelebrationOverlay(action);
-
-      if (result.created) {
-        console.log(chalk.green(`✓ Created "${result.name}"`));
-        console.log(`  Size: ${result.width}x${result.height}`);
-        console.log(`  URL: ${result.url}`);
-        console.log(chalk.cyan('\nNext steps:'));
-        console.log('  1. Start the overlay server: npm run alerts');
-        console.log('  2. Test with: npm run obs celebrate follow "YourName"');
-      } else if (result.action === 'show') {
-        console.log(chalk.green(`${result.name} SHOWN`));
-      } else if (result.action === 'hide') {
-        console.log(chalk.yellow(`${result.name} HIDDEN`));
-      } else if (result.action === 'refresh') {
-        console.log(chalk.green(`${result.name} REFRESHED`));
-      }
-    } catch (error) {
-      console.error(chalk.red('Failed:'), error.message);
-    } finally {
-      await obs.disconnect();
-    }
-  });
-
 // Monitor (live dashboard)
 program
   .command('monitor')
@@ -382,6 +327,89 @@ program
   .action(async (options) => {
     const affiliate = require('./commands/affiliate');
     await affiliate(options);
+  });
+
+// Stream config - apply stream.config.json to Twitch channel
+program
+  .command('stream-config')
+  .description('Apply stream.config.json to Twitch channel')
+  .option('-s, --show', 'Show current channel settings without applying')
+  .action(async (options) => {
+    const TwitchClient = require('./lib/twitch');
+    const fs = require('fs');
+    const path = require('path');
+    const twitch = new TwitchClient();
+
+    const configPath = path.join(process.cwd(), 'stream.config.json');
+
+    try {
+      if (options.show) {
+        // Show current channel settings
+        const info = await twitch.getChannelInfo();
+        console.log(chalk.bold('\n=== Current Channel Settings ==='));
+        console.log(`Title: ${chalk.cyan(info.title)}`);
+        console.log(`Category: ${chalk.cyan(info.category)}`);
+        console.log(`Language: ${info.language}`);
+        console.log(`Tags: ${info.tags.length > 0 ? info.tags.join(', ') : '(none)'}`);
+        console.log(`Branded Content: ${info.brandedContent ? 'Yes' : 'No'}`);
+        return;
+      }
+
+      // Load config file
+      if (!fs.existsSync(configPath)) {
+        console.error(chalk.red('stream.config.json not found'));
+        console.log(chalk.yellow('Create one with: npm run obs stream-config --show'));
+        return;
+      }
+
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      console.log(chalk.bold('\n=== Applying Stream Config ===\n'));
+
+      // Build update payload
+      const update = {};
+
+      if (config.title) {
+        update.title = config.title;
+        console.log(`Title: ${chalk.cyan(config.title)}`);
+      }
+
+      if (config.category) {
+        // Look up category ID
+        const category = await twitch.getCategoryByName(config.category);
+        if (category) {
+          update.game_id = category.id;
+          console.log(`Category: ${chalk.cyan(config.category)} (${category.id})`);
+        } else {
+          console.log(chalk.yellow(`Category "${config.category}" not found - skipping`));
+        }
+      }
+
+      if (config.language) {
+        update.broadcaster_language = config.language;
+        console.log(`Language: ${config.language}`);
+      }
+
+      if (config.tags) {
+        update.tags = config.tags;
+        console.log(`Tags: ${config.tags.join(', ')}`);
+      }
+
+      if (config.branded_content !== undefined) {
+        update.is_branded_content = config.branded_content;
+        console.log(`Branded Content: ${config.branded_content ? 'Yes' : 'No'}`);
+      }
+
+      // Apply update
+      if (Object.keys(update).length > 0) {
+        await twitch.updateChannel(update);
+        console.log(chalk.green('\n✓ Channel updated!'));
+      } else {
+        console.log(chalk.yellow('\nNo settings to update'));
+      }
+
+    } catch (error) {
+      console.error(chalk.red('Failed:'), error.message);
+    }
   });
 
 // WiFi fix - force 5GHz connection
@@ -453,145 +481,6 @@ program
         console.log(chalk.cyan('  Try: Windows Settings > WiFi > Forget network > Reconnect'));
       }
 
-    } catch (error) {
-      console.error(chalk.red('Failed:'), error.message);
-    }
-  });
-
-// Overlay server
-program
-  .command('overlay-server')
-  .alias('alerts')
-  .description('Start the overlay WebSocket server for alerts')
-  .option('-t, --test', 'Send a test follow after starting')
-  .action(async (options) => {
-    const { spawn } = require('child_process');
-    const path = require('path');
-
-    const args = [path.join(__dirname, '..', 'overlay', 'server.js')];
-    if (options.test) args.push('--test');
-
-    console.log(chalk.bold('\n🎬 Starting Overlay Server...\n'));
-
-    const server = spawn('node', args, {
-      stdio: 'inherit',
-      cwd: path.join(__dirname, '..'),
-    });
-
-    server.on('error', (err) => {
-      console.error(chalk.red('Failed to start server:'), err.message);
-    });
-  });
-
-// Celebrate - trigger overlay effect
-program
-  .command('celebrate <type> [username]')
-  .alias('trigger')
-  .description('Trigger an overlay effect (follow, raid, subscribe)')
-  .option('-v, --viewers <count>', 'Viewer count for raids', '50')
-  .option('-m, --months <count>', 'Month count for subscriptions', '1')
-  .action(async (type, username, options) => {
-    const WebSocket = require('ws');
-
-    const events = {
-      follow: { type: 'follow', username: username || 'TestFollower' },
-      raid: { type: 'raid', username: username || 'RaidLeader', viewers: parseInt(options.viewers) },
-      subscribe: { type: 'subscribe', username: username || 'NewSub', months: parseInt(options.months) },
-      sub: { type: 'subscribe', username: username || 'NewSub', months: parseInt(options.months) },
-    };
-
-    const event = events[type];
-    if (!event) {
-      console.error(chalk.red(`Unknown event type: ${type}`));
-      console.log('Available: follow, raid, subscribe');
-      return;
-    }
-
-    try {
-      const ws = new WebSocket('ws://localhost:8080');
-
-      ws.on('open', () => {
-        console.log(chalk.green(`🎉 Triggering ${type}: ${event.username}`));
-        ws.send(JSON.stringify(event));
-        setTimeout(() => {
-          ws.close();
-          console.log(chalk.green('✅ Event sent!'));
-        }, 100);
-      });
-
-      ws.on('error', () => {
-        console.error(chalk.red('❌ Could not connect to overlay server'));
-        console.log(chalk.yellow('   Start it first: npm run obs overlay-server'));
-      });
-    } catch (error) {
-      console.error(chalk.red('Failed:'), error.message);
-    }
-  });
-
-// Chat - send test chat message to overlay only
-program
-  .command('chat <message>')
-  .description('Send a test chat message to the overlay (not to Twitch)')
-  .option('-u, --user <name>', 'Username to display', 'ClaudeBot')
-  .option('-c, --color <hex>', 'Username color (hex)', '#9146FF')
-  .option('-b, --badges <list>', 'Badges (broadcaster,moderator,vip,subscriber)', '')
-  .action(async (message, options) => {
-    const WebSocket = require('ws');
-
-    const badges = options.badges ? options.badges.split(',').map(b => b.trim()) : [];
-
-    const event = {
-      type: 'chat',
-      username: options.user,
-      message: message,
-      color: options.color,
-      badges: badges,
-    };
-
-    try {
-      const ws = new WebSocket('ws://localhost:8080');
-
-      ws.on('open', () => {
-        console.log(chalk.cyan(`💬 ${options.user}: ${message}`));
-        ws.send(JSON.stringify(event));
-        setTimeout(() => {
-          ws.close();
-          console.log(chalk.green('✅ Sent to overlay!'));
-        }, 100);
-      });
-
-      ws.on('error', () => {
-        console.error(chalk.red('❌ Could not connect to overlay server'));
-        console.log(chalk.yellow('   Start it first: npm run obs overlay-server'));
-      });
-    } catch (error) {
-      console.error(chalk.red('Failed:'), error.message);
-    }
-  });
-
-// Say - send message to actual Twitch chat
-program
-  .command('say <message>')
-  .description('Send a message to Twitch chat (appears in real chat)')
-  .action(async (message) => {
-    const WebSocket = require('ws');
-
-    try {
-      const ws = new WebSocket('ws://localhost:8080');
-
-      ws.on('open', () => {
-        console.log(chalk.magenta(`📤 Sending to Twitch: ${message}`));
-        ws.send(JSON.stringify({ type: 'send', message }));
-        setTimeout(() => {
-          ws.close();
-          console.log(chalk.green('✅ Sent to Twitch chat!'));
-        }, 100);
-      });
-
-      ws.on('error', () => {
-        console.error(chalk.red('❌ Could not connect to overlay server'));
-        console.log(chalk.yellow('   Start it first: npm run obs overlay-server'));
-      });
     } catch (error) {
       console.error(chalk.red('Failed:'), error.message);
     }

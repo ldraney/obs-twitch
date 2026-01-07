@@ -1,7 +1,10 @@
 /**
  * Twitch API Client
  *
- * Provides access to Twitch Helix API for affiliate tracking.
+ * Provides access to Twitch Helix API for:
+ * - Affiliate tracking (followers, stream status)
+ * - Channel configuration (title, category, tags)
+ *
  * Credentials loaded from ~/twitch-secrets/.env
  */
 
@@ -125,6 +128,84 @@ class TwitchClient {
 
   isConfigured() {
     return !!(CLIENT_ID && CLIENT_SECRET);
+  }
+
+  /**
+   * Get current channel information
+   */
+  async getChannelInfo() {
+    if (!this.userId) {
+      await this.getUser();
+    }
+    const data = await this.apiCall(`/channels?broadcaster_id=${this.userId}`);
+    if (data.data?.length > 0) {
+      const channel = data.data[0];
+      return {
+        title: channel.title,
+        category: channel.game_name,
+        categoryId: channel.game_id,
+        language: channel.broadcaster_language,
+        tags: channel.tags || [],
+        brandedContent: channel.is_branded_content,
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Search for a category/game by name
+   */
+  async searchCategories(query) {
+    const data = await this.apiCall(`/search/categories?query=${encodeURIComponent(query)}`);
+    return data.data || [];
+  }
+
+  /**
+   * Get category by exact name
+   */
+  async getCategoryByName(name) {
+    const data = await this.apiCall(`/games?name=${encodeURIComponent(name)}`);
+    if (data.data?.length > 0) {
+      return data.data[0];
+    }
+    return null;
+  }
+
+  /**
+   * Update channel configuration
+   * @param {Object} config - Channel configuration
+   * @param {string} [config.title] - Stream title
+   * @param {string} [config.game_id] - Category/game ID
+   * @param {string} [config.broadcaster_language] - Language code (e.g., 'en')
+   * @param {string[]} [config.tags] - Array of tags
+   * @param {boolean} [config.is_branded_content] - Branded content flag
+   */
+  async updateChannel(config) {
+    if (!this.userId) {
+      await this.getUser();
+    }
+    await this.ensureToken();
+
+    const response = await fetch(`${API_BASE}/channels?broadcaster_id=${this.userId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${this.accessToken}`,
+        'Client-Id': CLIENT_ID,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(config),
+    });
+
+    if (response.status === 204) {
+      return { success: true };
+    }
+
+    if (response.status === 401) {
+      throw new Error('Token missing channel:manage:broadcast scope. Re-run: cd ~/twitch-client && node auth.js user');
+    }
+
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to update channel');
   }
 }
 

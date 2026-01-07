@@ -1,7 +1,7 @@
 # OBS Twitch Streaming Setup
 
 ## Project Goal
-Achieve Twitch Affiliate status by streaming consistently with high-quality settings.
+OBS stream health monitoring + Twitch channel configuration for going live.
 
 ## Affiliate Requirements (30-day window)
 - [ ] 7+ different stream days
@@ -29,13 +29,11 @@ slight sharpening.
 - `src/lib/metrics.js` - OBS WebSocket metrics collection
 - `src/lib/db.js` - SQLite database for stream history
 - `src/lib/alerts.js` - Threshold-based alerting
-- `src/lib/twitch.js` - Twitch API client for affiliate tracking
+- `src/lib/twitch.js` - Twitch API client (affiliate tracking + channel config)
 - `src/commands/monitor.js` - Live terminal UI (Ink/React)
 - `src/commands/report.js` - Post-stream report generator
 - `src/commands/affiliate.js` - Affiliate progress tracker
-- `overlay/index.html` - OBS Browser Source overlay (celebrations + chat)
-- `overlay/server.js` - WebSocket server (Twitch EventSub + IRC chat)
-- `overlay/modules/chat.js` - Chat display module
+- `stream.config.json` - Twitch channel configuration
 - `.env` - Contains OBS WebSocket password (gitignored)
 - `~/twitch-secrets/.env` - Twitch API credentials (separate private repo)
 - `data/streams.db` - SQLite database (gitignored)
@@ -86,6 +84,10 @@ npm run obs start              # Start streaming (no WiFi check)
 npm run obs stop               # Stop streaming
 npm run obs status             # Get stream status with color-coded metrics
 
+# Twitch channel config
+npm run obs stream-config      # Apply stream.config.json to Twitch
+npm run obs stream-config -s   # Show current channel settings
+
 # WiFi (fixes dropped frames from 2.4GHz)
 npm run obs wifi               # Force reconnect to 5GHz band
 npm run obs wifi -- -c         # Check current band without reconnecting
@@ -112,14 +114,35 @@ npm run obs refresh <source>   # Toggle off/on to fix capture
 npm run obs capture-audio <src>  # Enable audio capture on window/game source
 npm run obs mute <source>        # Mute an audio source
 npm run obs unmute <source>      # Unmute an audio source
+```
 
-# Chat overlay (test messages to overlay only)
-npm run obs chat "Hello world!"  # Send test message to overlay
-npm run obs chat "Hi" -u Viewer  # Send as specific user
-npm run obs chat "Hi" -c "#FF0000" -b broadcaster  # Custom color + badge
+## Stream Config
 
-# Butler bot (sends to real Twitch chat as butlerbotphilo)
-npm run obs say "Hello chat!"    # Bot posts to Twitch chat
+Configure your Twitch channel settings in `stream.config.json`:
+
+```json
+{
+  "title": "Focused Coding Session",
+  "category": "Software and Game Development",
+  "language": "en",
+  "tags": ["English", "Coding", "DevOps"],
+  "branded_content": false
+}
+```
+
+### Configurable Fields
+| Field | Description |
+|-------|-------------|
+| `title` | Stream title |
+| `category` | Category/game name (auto-lookup to ID) |
+| `language` | ISO 639-1 code (en, es, etc.) |
+| `tags` | Array of custom tags |
+| `branded_content` | Sponsored content flag |
+
+### Usage
+```bash
+npm run obs stream-config      # Apply config to Twitch
+npm run obs stream-config -s   # View current channel settings
 ```
 
 ## Stream Monitoring
@@ -187,7 +210,7 @@ node src/cli.js audio
 ### Common causes:
 1. **Capture Audio disabled** - Window/Game capture not capturing game sound
    - Fix: `node src/cli.js capture-audio "Palworld Window"`
-2. **Source muted** - Audio source shows 🔇 MUTED
+2. **Source muted** - Audio source shows MUTED
    - Fix: `node src/cli.js unmute "Source Name"`
 3. **No global audio** - No Desktop Audio or Mic configured
    - Fix: In OBS > Settings > Audio > Global Audio Devices
@@ -199,171 +222,6 @@ node src/cli.js audio
 - **Window/Game Capture Audio** - Captures audio from specific app (preferred)
 - **Desktop Audio** - Captures ALL system audio (includes Discord, notifications)
 - **Mic/Aux** - Your microphone for commentary
-
-## Terminal Overlay Setup
-
-Show Windows Terminal as a transparent overlay while gaming, so viewers can watch you code.
-
-### Setup:
-```bash
-node src/cli.js overlay create  # Creates Window Capture source for Windows Terminal
-```
-
-This auto-creates "Terminal Overlay" source, captures Windows Terminal, and scales it to fill the base canvas (2560x1440).
-
-### Windows Terminal transparency:
-- Open Windows Terminal Settings > Appearance
-- Set Background opacity to ~70%
-- The game will show through the terminal background
-
-### CLI commands:
-```bash
-node src/cli.js overlay create  # One-time setup
-node src/cli.js overlay show    # Show overlay (when coding)
-node src/cli.js overlay hide    # Hide overlay (when just gaming)
-node src/cli.js overlay 0.7     # Set OBS-level opacity (0.0-1.0)
-```
-
-### Positioning notes:
-- Source is scaled to BASE resolution (2560x1440), not output (1664x936)
-- OBS downscales the whole canvas to output resolution
-- To resize/reposition, modify transform in src/cli.js `controlOverlay()` function
-
-## Celebration Overlay Setup
-
-Show confetti and animations when you get new followers, raids, or subscribers.
-
-### One-time setup:
-```bash
-npm run obs celebration create   # Adds Browser Source to OBS
-```
-
-This creates "Celebration Overlay" as a Browser Source pointing to `overlay/index.html`, scaled to fill your canvas (2560x1440), and positioned on top of other sources.
-
-### Usage:
-```bash
-# Terminal 1: Start the overlay server (connects to Twitch EventSub)
-npm run alerts
-
-# Terminal 2 (optional): Test it works
-npm run obs celebrate follow "TestUser"
-npm run obs celebrate raid "RaidLeader" -v 100
-npm run obs celebrate sub "NewSub" -m 3
-```
-
-### CLI commands:
-```bash
-npm run obs celebration create   # One-time setup (adds Browser Source to OBS)
-npm run obs celebration show     # Show the overlay
-npm run obs celebration hide     # Hide the overlay
-npm run obs celebration refresh  # Refresh browser (reconnect WebSocket)
-```
-
-### Files:
-- `overlay/index.html` - The overlay page (loaded by OBS Browser Source)
-- `overlay/server.js` - WebSocket server connecting Twitch EventSub to overlay
-- `overlay/modules/follow.js` - Confetti animation for follows
-- `overlay/modules/raid.js` - Viking animation for raids
-- `overlay/modules/subscribe.js` - Celebration for subs
-
-### Keyboard shortcuts (in browser):
-Press these keys when viewing `overlay/index.html` directly in a browser:
-- `F` - Test follow animation
-- `R` - Test raid animation
-- `S` - Test subscribe animation
-- `C` - Test chat message
-
-## Chat Overlay Setup
-
-Display Twitch chat messages on your stream overlay in a persistent chatbox.
-
-### How it works:
-1. The overlay server connects to Twitch IRC (reads chat)
-2. Butler bot (butlerbotphilo) connects separately to send messages
-3. Real chat messages displayed on overlay
-4. CLI commands for testing and bot messages
-
-### Usage:
-```bash
-# Terminal 1: Start the overlay server
-npm run alerts
-
-# Terminal 2: Send messages
-npm run obs say "Hello chat!"        # Butler posts to REAL Twitch chat
-npm run obs chat "Test" -u TestUser  # Test message to overlay only
-```
-
-### Butler Bot (butlerbotphilo)
-The butler is an AI assistant bot that posts to real Twitch chat:
-- Account: butlerbotphilo (must follow channel + be modded)
-- Credentials: ~/twitch-secrets/.env (BOT_ACCESS_TOKEN, BOT_REFRESH_TOKEN)
-- Character guide: ~/butlerbotphilo/CLAUDE.md
-- Command: `npm run obs say "message"`
-
-### Chat CLI options:
-```bash
-npm run obs say "<message>"         # Butler posts to Twitch chat
-npm run obs chat "<message>"        # Test message to overlay only
-npm run obs chat "Hi" -u <name>     # Test as specific username
-npm run obs chat "Hi" -c "#FF0000"  # Set username color (hex)
-npm run obs chat "Hi" -b moderator  # Add badge
-```
-
-### Chat display features:
-- Persistent chatbox (bottom-right, messages stay visible)
-- Username colors from Twitch
-- Badges: broadcaster, moderator, VIP, subscriber
-- Max 50 messages before oldest removed
-- Auto-scrolls to newest
-
-### Files:
-- `overlay/modules/chat.js` - Chat display module
-- `overlay/server.js` - Twitch IRC + bot connections
-- `~/butlerbotphilo/CLAUDE.md` - Butler personality guide
-
-## Overlay Testing (Playwright)
-
-Automated tests for the stream overlay (chat, celebrations, effects).
-
-### Running Tests
-```bash
-npm run test:overlay          # Run all overlay tests
-npm run test:overlay:headed   # See the browser while testing
-npm run test:overlay:ui       # Playwright UI mode (interactive)
-npm run test:all              # Run both lofi and overlay tests
-```
-
-### What's Tested
-- Page loads without JS errors
-- ES modules load correctly
-- Chat module initializes
-- Canvas and chat container exist
-- Keyboard shortcuts trigger events (C=chat, F=follow, R=raid, S=sub)
-- Chat messages render with username and text
-- Multiple messages stack properly
-- Chat container auto-scrolls
-- Visual styling (positioning, purple border)
-
-### Test Files
-- `overlay/tests/playwright.config.cjs` - Playwright configuration
-- `overlay/tests/smoke.spec.cjs` - Smoke tests (15 tests)
-
-### Manual Testing
-```bash
-# Terminal 1: Start the server
-npm run alerts
-
-# Terminal 2: Trigger test events
-node overlay/test/trigger.js chat "TestUser" "Hello!"
-node overlay/test/trigger.js follow "NewFollower"
-node overlay/test/trigger.js raid "RaidLeader" 50
-node overlay/test/trigger.js sub "NewSub" 3
-```
-
-### Troubleshooting Tests
-- Tests run without WebSocket server (uses keyboard shortcuts)
-- If Twitch token expires: `cd ~/twitch-client && node auth.js refresh`
-- Update `~/twitch-secrets/.env` with new token
 
 ## Troubleshooting WiFi/Network Issues
 
@@ -396,37 +254,29 @@ ping -n 5 10.0.0.1             # Test latency (should be <5ms)
 
 ## Satellite Repos
 
-This repo is the **centroid** that coordinates streaming infrastructure. Related repos:
+This repo handles stream health monitoring and channel configuration. Related repos:
 
 | Repo | Location | Purpose |
 |------|----------|---------|
 | `twitch-secrets` | `~/twitch-secrets/` | API credentials (.env with tokens) |
 | `twitch-client` | `~/twitch-client/` | Token refresh: `node auth.js refresh` |
+| `twitch-overlays` | `~/twitch-overlays/` | Stream overlays (chat, celebrations) |
 | `lofi-overlay` | `~/lofi-overlay/` | Audio-reactive visual overlays for OBS |
-| `butlerbotphilo` | `~/butlerbotphilo/` | Butler bot personality guide |
-| `lofi-development-docs` | `~/lofi-development-docs/` | Obsidian vault for lofi learning |
 
 ### Token Refresh Workflow
 
-When Twitch tokens expire (overlay server fails to connect):
+When Twitch tokens expire:
 
 ```bash
-# Refresh main user token
 cd ~/twitch-client && node auth.js refresh
 # Copy new TWITCH_ACCESS_TOKEN to ~/twitch-secrets/.env
-
-# Refresh bot token (manual curl)
-source ~/twitch-secrets/.env
-curl -s -X POST 'https://id.twitch.tv/oauth2/token' \
-  -d "client_id=$TWITCH_CLIENT_ID&client_secret=$TWITCH_CLIENT_SECRET&grant_type=refresh_token&refresh_token=$BOT_REFRESH_TOKEN"
-# Copy new access_token to BOT_ACCESS_TOKEN in ~/twitch-secrets/.env
 ```
 
 ### Daily Stream Startup
 
 ```bash
-# 1. Start overlay server (celebrations + chat)
-npm run alerts
+# 1. Configure channel (title, category)
+npm run obs stream-config
 
 # 2. Pre-flight check + go live
 npm run obs go

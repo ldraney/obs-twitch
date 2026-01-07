@@ -15,14 +15,7 @@
     "diagnose": "node src/cli.js diagnose",
     "report": "node src/cli.js report",
     "affiliate": "node src/cli.js affiliate",
-    "alerts": "node src/cli.js overlay-server",
-    "celebrate": "node src/cli.js celebrate",
-    "test:follow": "node tests/follow.js",
-    "test:raid": "node tests/raid.js",
-    "test:sub": "node tests/sub.js",
-    "test": "npx playwright test --config=overlay/tests/playwright.config.cjs",
-    "test:headed": "npx playwright test --config=overlay/tests/playwright.config.cjs --headed",
-    "test:ui": "npx playwright test --config=overlay/tests/playwright.config.cjs --ui"
+    "stream-config": "node src/cli.js stream-config"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
@@ -39,9 +32,7 @@
     "doc": "docs",
     "test": "tests"
   },
-  "devDependencies": {
-    "@playwright/test": "^1.57.0"
-  },
+  "devDependencies": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ldraney/obs-twitch.git"
