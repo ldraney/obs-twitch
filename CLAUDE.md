@@ -260,7 +260,7 @@ This repo handles stream health monitoring and channel configuration. Related re
 |------|----------|---------|
 | `twitch-secrets` | `~/twitch-secrets/` | API credentials (.env with tokens) |
 | `twitch-client` | `~/twitch-client/` | Token refresh: `node auth.js refresh` |
-| `twitch-overlays` | `~/twitch-overlays/` | Stream overlays (chat, celebrations) |
+| `twitch-overlays` | `~/twitch-overlays/` | Overlay manager with MCP server (start/stop overlays from Claude) |
 | `lofi-overlay` | `~/lofi-overlay/` | Audio-reactive visual overlays for OBS |
 
 ### Token Refresh Workflow
@@ -272,12 +272,15 @@ cd ~/twitch-client && node auth.js refresh
 # Copy new TWITCH_ACCESS_TOKEN to ~/twitch-secrets/.env
 ```
 
-### Daily Stream Startup
+### Stream Startup Checklist
 
-```bash
-# 1. Configure channel (title, category)
-npm run obs stream-config
-
-# 2. Pre-flight check + go live
-npm run obs go
-```
+1. **Start stream manually** in OBS
+2. **Configure channel** - use obs-twitch to check health, set title/category/daily goal
+   ```bash
+   npm run obs stream-config
+   npm run obs go
+   ```
+3. **Start overlays** - use twitch-overlays MCP or CLI
+   ```bash
+   cd ~/twitch-overlays && npm run start-all
+   ```
